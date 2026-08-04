@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.3",
-  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.3/GpsMock.apk",
-  "notes": "Kalender mit allen geplanten Fahrten. Wochentage frei waehlbar (Werktags, Wochenende, einzelne Tage). Karte oeffnet jetzt auf der eigenen Position. Benachrichtigungen bei gestoppter Simulation, entzogener Berechtigung und faelliger Fahrt. Optionaler Auto-Start zur Abfahrtszeit."
+  "versionCode": 5,
+  "versionName": "1.4",
+  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.4/GpsMock.apk",
+  "notes": "Karten-Auswahl: 'Karte' oeffnet jetzt eine echte Vollbildkarte mit Fadenkreuz, Suche und Standort-Button. Die Adresse unter dem Fadenkreuz wird live aufgeloest. Adressvorschlaege beim Tippen wie bei Google Maps - antippen uebernimmt den Ort."
 }
