@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var b: ActivityMainBinding
+    private lateinit var searchSuggest: PlaceSuggest
 
     /** One silent check per app launch; manual checks go through the menu. */
     private var updateCheckedThisLaunch = false
@@ -215,6 +216,7 @@ class MainActivity : AppCompatActivity() {
 
         b.fabLocate.setOnClickListener { locateSelf(recenter = true) }
 
+        searchSuggest = PlaceSuggest(b.searchInput, lifecycleScope) { goTo(it) }
         b.searchBtn.setOnClickListener { runSearch() }
         b.searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -249,6 +251,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun goTo(p: Place) {
+        searchSuggest.dismiss()
+        hideKeyboard()
         b.map.controller.setZoom(16.0)
         b.map.controller.animateTo(GeoPoint(p.lat, p.lon))
         onCenterChanged()

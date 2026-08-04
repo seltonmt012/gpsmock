@@ -49,6 +49,10 @@
     <string name="trip_end">Ziel</string>
     <string name="trip_search_hint">Adresse oder Ort</string>
     <string name="trip_from_map">Karte</string>
+    <string name="picker_search_hint">Adresse suchen oder Karte schieben</string>
+    <string name="picker_hint">Karte schieben zum Wählen</string>
+    <string name="picker_unknown">Kein Name für diesen Punkt</string>
+    <string name="picker_confirm">Diesen Punkt übernehmen</string>
     <string name="trip_not_set">— noch nicht gesetzt —</string>
     <string name="trip_times">Uhrzeiten</string>
     <string name="trip_out_time">Hin: %1$s</string>

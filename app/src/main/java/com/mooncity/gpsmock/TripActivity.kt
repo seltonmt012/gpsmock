@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -38,6 +39,8 @@ class TripActivity : AppCompatActivity() {
     }
 
     private lateinit var b: ActivityTripBinding
+    private lateinit var startSuggest: PlaceSuggest
+    private lateinit var endSuggest: PlaceSuggest
     private val hhmm: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     private var startPoint: Place? = null
@@ -101,22 +104,26 @@ class TripActivity : AppCompatActivity() {
         // Changing the profile invalidates whatever was routed before.
         b.modeGroup.addOnButtonCheckedListener { _, _, isChecked -> if (isChecked) invalidateRoute() }
 
+        startSuggest = PlaceSuggest(b.startInput, lifecycleScope) { adopt(it, isStart = true) }
+        endSuggest = PlaceSuggest(b.endInput, lifecycleScope) { adopt(it, isStart = false) }
+
         b.startFromMap.setOnClickListener {
-            startPoint = Place(getString(R.string.trip_from_map), mapLat, mapLon)
-            b.startInput.setText("")
-            invalidateRoute(); showResolved()
+            startPicker.launch(
+                MapPickerActivity.intent(
+                    this, getString(R.string.trip_start),
+                    startPoint?.lat ?: mapLat.takeIf { it != 0.0 },
+                    startPoint?.lon ?: mapLon.takeIf { it != 0.0 }
+                )
+            )
         }
         b.endFromMap.setOnClickListener {
-            endPoint = Place(getString(R.string.trip_from_map), mapLat, mapLon)
-            b.endInput.setText("")
-            invalidateRoute(); showResolved()
-        }
-
-        b.startInput.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) resolve(b.startInput.text.toString()) { startPoint = it }
-        }
-        b.endInput.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) resolve(b.endInput.text.toString()) { endPoint = it }
+            endPicker.launch(
+                MapPickerActivity.intent(
+                    this, getString(R.string.trip_end),
+                    endPoint?.lat ?: mapLat.takeIf { it != 0.0 },
+                    endPoint?.lon ?: mapLon.takeIf { it != 0.0 }
+                )
+            )
         }
 
         b.btnOutTime.setOnClickListener { pickTime(outTime) { outTime = it; updateTimeLabels(); invalidateRoute() } }
@@ -220,26 +227,30 @@ class TripActivity : AppCompatActivity() {
         b.btnReturnTime.text = getString(R.string.trip_return_time, returnTime.format(hhmm))
     }
 
-    private fun resolve(query: String, assign: (Place) -> Unit) {
-        val q = query.trim()
-        if (q.isEmpty()) return
-        lifecycleScope.launch {
-            val results = runCatching { Nominatim.search(q) }.getOrDefault(emptyList())
-            when {
-                results.isEmpty() -> toast(getString(R.string.search_none))
-                results.size == 1 -> {
-                    assign(results.first()); invalidateRoute(); showResolved()
-                }
+    private fun adopt(place: Place, isStart: Boolean) {
+        if (isStart) startPoint = place else endPoint = place
+        invalidateRoute()
+        showResolved()
+    }
 
-                else -> AlertDialog.Builder(this@TripActivity)
-                    .setTitle(R.string.search_pick)
-                    .setItems(results.map { it.name }.toTypedArray()) { _, i ->
-                        assign(results[i]); invalidateRoute(); showResolved()
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-            }
-        }
+    private val startPicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> handlePicked(result, isStart = true) }
+
+    private val endPicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> handlePicked(result, isStart = false) }
+
+    private fun handlePicked(result: androidx.activity.result.ActivityResult, isStart: Boolean) {
+        if (result.resultCode != RESULT_OK) return
+        val data = result.data ?: return
+        val place = Place(
+            name = data.getStringExtra(MapPickerActivity.EXTRA_NAME).orEmpty(),
+            lat = data.getDoubleExtra(MapPickerActivity.EXTRA_LAT, 0.0),
+            lon = data.getDoubleExtra(MapPickerActivity.EXTRA_LON, 0.0)
+        )
+        (if (isStart) startSuggest else endSuggest).setText(place.primary)
+        adopt(place, isStart)
     }
 
     private fun showResolved() {
@@ -247,7 +258,7 @@ class TripActivity : AppCompatActivity() {
         b.endResolved.text = endPoint?.let { fmt(it) } ?: getString(R.string.trip_not_set)
     }
 
-    private fun fmt(p: Place) = String.format(Locale.US, "%.5f, %.5f  %s", p.lat, p.lon, p.name)
+    private fun fmt(p: Place) = String.format(Locale.US, "%.5f, %.5f", p.lat, p.lon)
 
     private fun invalidateRoute() {
         outboundRoute = null
@@ -320,8 +331,8 @@ class TripActivity : AppCompatActivity() {
 
         val trip = Trip(
             mode = selectedMode(),
-            startLat = s.lat, startLon = s.lon, startName = s.name,
-            endLat = e.lat, endLon = e.lon, endName = e.name,
+            startLat = s.lat, startLon = s.lon, startName = s.primary,
+            endLat = e.lat, endLon = e.lon, endName = e.primary,
             outTime = outTime,
             returnTime = returnTime,
             days = selectedDays(),
