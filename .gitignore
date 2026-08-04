@@ -1,0 +1,22 @@
+# Signing material - must never be published
+keystore/
+keystore.properties
+*.jks
+*.keystore
+
+# Local SDK paths
+local.properties
+
+# Build output
+build/
+.gradle/
+*.apk
+*.aab
+
+# Downloaded toolchain
+_tools/
+
+# IDE
+.idea/
+*.iml
+.DS_Store

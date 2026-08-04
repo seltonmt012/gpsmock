@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GPS Mock</string>
+
+    <string name="crosshair_desc">Zielpunkt</string>
+    <string name="search_hint">Ort suchen (z. B. Berlin)</string>
+    <string name="search_none">Nichts gefunden</string>
+    <string name="search_pick">Ort wählen</string>
+
+    <string name="start">Start</string>
+    <string name="stop">Stopp</string>
+    <string name="setup">Setup</string>
+    <string name="later">Später</string>
+
+    <string name="status_running">Aktiv – Position wird gesendet</string>
+    <string name="status_idle">Karte verschieben, dann Start</string>
+
+    <string name="channel_name">Standort-Simulation</string>
+    <string name="channel_desc">Läuft, solange eine Position simuliert wird</string>
+    <string name="channel_resume_name">Fortsetzen</string>
+
+    <string name="notif_title">GPS Mock aktiv</string>
+    <string name="notif_error">GPS Mock gestoppt</string>
+    <string name="notif_text">%1$.6f, %2$.6f</string>
+    <string name="action_stop">Stopp</string>
+
+    <string name="resume_title">GPS Mock fortsetzen</string>
+    <string name="resume_text">Nach dem Neustart konnte die Simulation nicht automatisch starten. Zum Fortsetzen tippen.</string>
+
+    <string name="err_not_mock_app">App ist nicht als Simulations-App gesetzt. Entwickleroptionen öffnen.</string>
+    <string name="err_unknown">Kein Provider konnte registriert werden.</string>
+    <string name="err_no_location_permission">Standort-Berechtigung fehlt.</string>
+    <string name="err_no_dev_options">Entwickleroptionen nicht gefunden. Einstellungen → Über das Telefon → 7× auf Build-Nummer tippen.</string>
+
+    <string name="setup_title">Einrichtung</string>
+    <string name="setup_mock_msg">Die App muss von Android als Simulations-App zugelassen werden.\n\n1. Einstellungen → Über das Telefon → 7× auf „Build-Nummer“ tippen\n2. Einstellungen → System → Entwickleroptionen\n3. „App für simulierte Standorte auswählen“ → GPS Mock</string>
+    <string name="setup_full_msg">Für eine stabile Simulation:\n\n1. Entwickleroptionen → „App für simulierte Standorte auswählen“ → GPS Mock\n2. Einstellungen → Apps → GPS Mock → Akku → „Uneingeschränkt“\n3. Gleiche Seite: „App-Aktivität pausieren, wenn nicht genutzt“ aus\n4. Einstellungen → Standort → Standortdienste → „Google-Standortgenauigkeit“ aus\n\nOhne Schritt 2 friert Android die Simulation bei ausgeschaltetem Display ein und die echte Position kommt zurück.</string>
+    <string name="open_dev_options">Entwickleroptionen</string>
+    <string name="open_battery">App-Einstellungen</string>
+
+    <string name="menu_setup">Einrichtung</string>
+    <string name="menu_update">Nach Update suchen</string>
+    <string name="menu_version">Version %1$s (Build %2$d)</string>
+
+    <string name="update_title">Update %1$s verfügbar</string>
+    <string name="update_no_notes">Keine Details hinterlegt.</string>
+    <string name="update_now">Jetzt updaten</string>
+    <string name="update_none">Schon aktuell</string>
+    <string name="update_check_failed">Update-Prüfung fehlgeschlagen</string>
+    <string name="update_downloading">Wird geladen…</string>
+    <string name="update_progress">Wird geladen… %1$d %%</string>
+    <string name="update_failed">Update fehlgeschlagen: %1$s</string>
+    <string name="update_title_permission">Berechtigung nötig</string>
+    <string name="update_permission_msg">Android muss dieser App erlauben, Updates zu installieren. Im nächsten Bildschirm „Apps aus dieser Quelle zulassen“ aktivieren, dann zurück und erneut auf Update tippen.</string>
+
+    <string name="battery_title">Akku-Optimierung</string>
+    <string name="battery_msg">Android beendet sonst die Simulation im Hintergrund und die echte Position wird wieder sichtbar. Ausnahme jetzt erlauben?</string>
+    <string name="battery_open">Erlauben</string>
+</resources>
