@@ -43,6 +43,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TripActivity"
+            android:exported="false"
+            android:label="@string/trip_title"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".MockLocationService"
             android:exported="false"

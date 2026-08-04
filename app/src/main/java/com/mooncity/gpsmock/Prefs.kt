@@ -12,6 +12,10 @@ object Prefs {
     private const val KEY_ACTIVE = "active"
     private const val KEY_ACCURACY = "accuracy"
     private const val KEY_JITTER = "jitter"
+    private const val KEY_MODE = "mode"
+
+    const val MODE_STATIC = "static"
+    const val MODE_TRIP = "trip"
 
     private fun sp(ctx: Context) = ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
@@ -37,6 +41,10 @@ object Prefs {
     /** True while the user wants mocking on. Survives process death and reboot. */
     fun setActive(ctx: Context, value: Boolean) = sp(ctx).edit().putBoolean(KEY_ACTIVE, value).apply()
     fun isActive(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_ACTIVE, false)
+
+    /** Which position source the service should use: a fixed point or a scheduled trip. */
+    fun mode(ctx: Context): String = sp(ctx).getString(KEY_MODE, MODE_STATIC) ?: MODE_STATIC
+    fun setMode(ctx: Context, mode: String) = sp(ctx).edit().putString(KEY_MODE, mode).apply()
 
     /** Reported horizontal accuracy in metres. Lower looks like a strong GPS fix. */
     fun accuracy(ctx: Context): Float = sp(ctx).getFloat(KEY_ACCURACY, 4f)

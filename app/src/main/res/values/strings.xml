@@ -38,6 +38,40 @@
     <string name="open_dev_options">Entwickleroptionen</string>
     <string name="open_battery">App-Einstellungen</string>
 
+    <string name="trip">Fahrt</string>
+    <string name="trip_title">Fahrt simulieren</string>
+    <string name="trip_subtitle">Route von A nach B, täglich zur eingestellten Uhrzeit. Die Position folgt der echten Straßenführung.</string>
+    <string name="trip_mode">Fortbewegung</string>
+    <string name="mode_car">Auto</string>
+    <string name="mode_bike">Fahrrad</string>
+    <string name="mode_foot">Zu Fuß</string>
+    <string name="trip_start">Startpunkt</string>
+    <string name="trip_end">Ziel</string>
+    <string name="trip_search_hint">Adresse oder Ort</string>
+    <string name="trip_from_map">Karte</string>
+    <string name="trip_not_set">— noch nicht gesetzt —</string>
+    <string name="trip_times">Uhrzeiten</string>
+    <string name="trip_out_time">Hin: %1$s</string>
+    <string name="trip_return_time">Zurück: %1$s</string>
+    <string name="trip_daily">Jeden Tag wiederholen</string>
+    <string name="trip_calc">Route berechnen</string>
+    <string name="trip_activate">Fahrt aktivieren</string>
+    <string name="trip_test_now">Jetzt sofort testen (einmalig)</string>
+    <string name="trip_need_points">Start und Ziel zuerst setzen</string>
+    <string name="trip_route_failed">Keine Route gefunden. Andere Punkte oder anderen Modus probieren.</string>
+    <string name="trip_summary">Hin: %1$s · %2$s\nZurück: %3$s · %4$s\n\nAnkunft ca. %5$s, Rückkehr ca. %6$s</string>
+    <string name="trip_saved">Fahrt aktiv</string>
+    <string name="trip_pick_out">Abfahrt hin</string>
+    <string name="trip_pick_return">Abfahrt zurück</string>
+
+    <string name="phase_outbound">Hinfahrt · %1$d %% · %2$d km/h</string>
+    <string name="phase_inbound">Rückfahrt · %1$d %% · %2$d km/h</string>
+    <string name="phase_at_destination">Am Ziel</string>
+    <string name="phase_at_start">Am Startpunkt</string>
+    <string name="phase_finished">Fahrt beendet</string>
+    <string name="err_no_trip">Keine Fahrt hinterlegt.</string>
+    <string name="status_trip">Fahrt aktiv – folgt dem Zeitplan</string>
+
     <string name="menu_setup">Einrichtung</string>
     <string name="menu_update">Nach Update suchen</string>
     <string name="menu_version">Version %1$s (Build %2$d)</string>

@@ -78,6 +78,7 @@
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/bottomCard"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="12dp"
@@ -108,27 +109,37 @@
                 android:layout_marginTop="4dp"
                 android:textSize="13sp" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggle"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/start"
+                android:textSize="15sp"
+                app:cornerRadius="16dp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToggle"
+                    android:id="@+id/btnTrip"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="52dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="@string/start"
-                    android:textSize="15sp"
+                    android:text="@string/trip"
                     app:cornerRadius="16dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSetup"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="52dp"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:text="@string/setup"
                     app:cornerRadius="16dp" />
             </LinearLayout>

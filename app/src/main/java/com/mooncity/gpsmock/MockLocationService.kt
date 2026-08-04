@@ -19,6 +19,10 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.mooncity.gpsmock.trip.Fix
+import com.mooncity.gpsmock.trip.Phase
+import com.mooncity.gpsmock.trip.Trip
+import com.mooncity.gpsmock.trip.TripSource
 import kotlin.random.Random
 
 /**
@@ -43,6 +47,7 @@ class MockLocationService : Service() {
 
         const val EXTRA_LAT = "lat"
         const val EXTRA_LON = "lon"
+        const val EXTRA_MODE = "mode"
 
         private const val CHANNEL_ID = "mock_location"
         private const val NOTIF_ID = 4711
@@ -71,8 +76,18 @@ class MockLocationService : Service() {
         fun start(ctx: Context, lat: Double, lon: Double) {
             val i = Intent(ctx, MockLocationService::class.java).apply {
                 action = ACTION_START
+                putExtra(EXTRA_MODE, Prefs.MODE_STATIC)
                 putExtra(EXTRA_LAT, lat)
                 putExtra(EXTRA_LON, lon)
+            }
+            ctx.startForegroundService(i)
+        }
+
+        /** Runs the saved trip; the position then follows the clock rather than a fixed point. */
+        fun startTrip(ctx: Context) {
+            val i = Intent(ctx, MockLocationService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_MODE, Prefs.MODE_TRIP)
             }
             ctx.startForegroundService(i)
         }
@@ -99,6 +114,9 @@ class MockLocationService : Service() {
 
     @Volatile private var lat = 0.0
     @Volatile private var lon = 0.0
+    @Volatile private var tripSource: TripSource? = null
+    @Volatile private var phaseLabel: String? = null
+    private var lastNotifUpdate = 0L
     private val registered = mutableSetOf<String>()
 
     private val tick = object : Runnable {
@@ -128,18 +146,38 @@ class MockLocationService : Service() {
             }
 
             ACTION_UPDATE -> {
-                lat = intent.getDoubleExtra(EXTRA_LAT, lat)
-                lon = intent.getDoubleExtra(EXTRA_LON, lon)
-                Prefs.saveTarget(this, lat, lon)
-                notifyForeground()
-                pushFix()
+                // Panning the map must not hijack a running trip.
+                if (tripSource == null) {
+                    lat = intent.getDoubleExtra(EXTRA_LAT, lat)
+                    lon = intent.getDoubleExtra(EXTRA_LON, lon)
+                    Prefs.saveTarget(this, lat, lon)
+                    notifyForeground()
+                    pushFix()
+                }
             }
 
             else -> {
                 // ACTION_START, or a null intent because the system restarted us (START_STICKY).
-                lat = intent?.getDoubleExtra(EXTRA_LAT, Prefs.lat(this)) ?: Prefs.lat(this)
-                lon = intent?.getDoubleExtra(EXTRA_LON, Prefs.lon(this)) ?: Prefs.lon(this)
-                Prefs.saveTarget(this, lat, lon)
+                val mode = intent?.getStringExtra(EXTRA_MODE) ?: Prefs.mode(this)
+                Prefs.setMode(this, mode)
+
+                if (mode == Prefs.MODE_TRIP) {
+                    val trip = Trip.load(this)
+                    if (trip == null) {
+                        lastError = getString(R.string.err_no_trip)
+                        Prefs.setActive(this, false)
+                        broadcastStatus()
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
+                    tripSource = TripSource(trip)
+                } else {
+                    tripSource = null
+                    lat = intent?.getDoubleExtra(EXTRA_LAT, Prefs.lat(this)) ?: Prefs.lat(this)
+                    lon = intent?.getDoubleExtra(EXTRA_LON, Prefs.lon(this)) ?: Prefs.lon(this)
+                    Prefs.saveTarget(this, lat, lon)
+                }
+
                 Prefs.setActive(this, true)
                 startMocking()
             }
@@ -200,6 +238,8 @@ class MockLocationService : Service() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
 
+        tripSource = null
+        phaseLabel = null
         isRunning = false
     }
 
@@ -254,13 +294,47 @@ class MockLocationService : Service() {
     }
 
     private fun pushFix() {
-        val snapshotLat = lat
-        val snapshotLon = lon
         val jitterOn = Prefs.jitter(this)
         val accuracy = Prefs.accuracy(this)
+        val now = System.currentTimeMillis()
+
+        var bearing = Random.nextDouble(0.0, 360.0).toFloat()
+        var speed = 0f
+        val snapshotLat: Double
+        val snapshotLon: Double
+
+        val source = tripSource
+        if (source != null) {
+            val fix = source.fixAt(now)
+            if (fix.phase == Phase.FINISHED) {
+                // One-off trip is over. Nothing left to report.
+                Prefs.setActive(this, false)
+                stopMocking()
+                broadcastStatus()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return
+            }
+            snapshotLat = fix.lat
+            snapshotLon = fix.lon
+            bearing = fix.bearing
+            speed = fix.speed
+            lat = fix.lat
+            lon = fix.lon
+
+            val label = describe(fix)
+            if (label != phaseLabel || now - lastNotifUpdate > 15_000) {
+                phaseLabel = label
+                lastNotifUpdate = now
+                notifyForeground()
+            }
+        } else {
+            snapshotLat = lat
+            snapshotLon = lon
+        }
 
         for (p in registered.toList()) {
-            val loc = buildLocation(p, snapshotLat, snapshotLon, jitterOn, accuracy)
+            val loc = buildLocation(p, snapshotLat, snapshotLon, jitterOn, accuracy, bearing, speed)
             try {
                 locationManager.setTestProviderLocation(p, loc)
             } catch (e: IllegalArgumentException) {
@@ -287,7 +361,9 @@ class MockLocationService : Service() {
         lat: Double,
         lon: Double,
         jitterOn: Boolean,
-        accuracy: Float
+        accuracy: Float,
+        bearingDeg: Float,
+        speedMps: Float
     ): Location {
         val wobble = if (jitterOn) JITTER_DEG else 0.0
         return Location(provider).apply {
@@ -295,8 +371,8 @@ class MockLocationService : Service() {
             longitude = lon + Random.nextDouble(-wobble, wobble)
             altitude = 42.0 + Random.nextDouble(-0.4, 0.4)
             this.accuracy = accuracy + Random.nextDouble(-0.4, 0.4).toFloat()
-            bearing = Random.nextDouble(0.0, 360.0).toFloat()
-            speed = 0f
+            bearing = bearingDeg
+            speed = speedMps
             // Consumers treat a fix without a fresh monotonic timestamp as stale and drop it.
             time = System.currentTimeMillis()
             elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
@@ -304,6 +380,20 @@ class MockLocationService : Service() {
             speedAccuracyMetersPerSecond = 0.3f
             verticalAccuracyMeters = 3f
         }
+    }
+
+    private fun describe(fix: Fix): String = when (fix.phase) {
+        Phase.OUTBOUND -> getString(
+            R.string.phase_outbound, (fix.progress * 100).toInt(), (fix.speed * 3.6f).toInt()
+        )
+
+        Phase.INBOUND -> getString(
+            R.string.phase_inbound, (fix.progress * 100).toInt(), (fix.speed * 3.6f).toInt()
+        )
+
+        Phase.AT_DESTINATION -> getString(R.string.phase_at_destination)
+        Phase.AT_START -> getString(R.string.phase_at_start)
+        Phase.FINISHED -> getString(R.string.phase_finished)
     }
 
     // -- notification -------------------------------------------------------------------------
@@ -333,7 +423,7 @@ class MockLocationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val text = lastError ?: getString(R.string.notif_text, lat, lon)
+        val text = lastError ?: phaseLabel ?: getString(R.string.notif_text, lat, lon)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(if (lastError != null) R.string.notif_error else R.string.notif_title))

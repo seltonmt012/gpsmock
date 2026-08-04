@@ -23,6 +23,18 @@ Fields that many mock apps leave unset — `verticalAccuracyMeters`,
 `bearingAccuracyDegrees`, `speedAccuracyMetersPerSecond` — are populated, because some
 consumers reject a fix without them.
 
+## Trips
+
+Besides a fixed point, the app can follow a route on a daily schedule: pick a start and a
+destination, choose car, bike or foot, and set a departure and a return time. Both legs are
+routed separately against the FOSSGIS OSRM servers, because one-way streets make the way
+back a different path.
+
+The position is computed as a pure function of the wall clock rather than accumulated tick
+by tick. A killed and restarted process therefore resumes at the correct point on the route
+instead of teleporting back to where it left off, and a phone that was off during the ride
+picks up wherever the schedule says it should be.
+
 ## Setup
 
 1. Install the APK from [Releases](../../releases/latest).

@@ -19,12 +19,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
 import com.mooncity.gpsmock.databinding.ActivityMainBinding
 import com.mooncity.gpsmock.update.UpdateChecker
 import com.mooncity.gpsmock.update.UpdateInfo
+import com.mooncity.gpsmock.route.Polyline
+import com.mooncity.gpsmock.trip.Trip
 import com.mooncity.gpsmock.update.Updater
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
@@ -48,6 +53,8 @@ class MainActivity : AppCompatActivity() {
     /** One silent check per app launch; manual checks go through the menu. */
     private var updateCheckedThisLaunch = false
 
+    private val routeOverlays = mutableListOf<org.osmdroid.views.overlay.Overlay>()
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = refreshUi()
     }
@@ -69,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
 
+        applyInsets()
         setUpMap()
         setUpControls()
         requestPermissions()
@@ -84,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         LocalBroadcastManager.getInstance(this)
             .registerReceiver(statusReceiver, IntentFilter(MockLocationService.BROADCAST_STATUS))
         refreshUi()
+        drawTripOverlay()
 
         if (!updateCheckedThisLaunch) {
             updateCheckedThisLaunch = true
@@ -98,6 +107,24 @@ class MainActivity : AppCompatActivity() {
         Prefs.saveZoom(this, b.map.zoomLevelDouble)
         b.map.onPause()
         super.onPause()
+    }
+
+    /**
+     * targetSdk 35 means Android 15 lays the window out edge to edge, so the cards would sit
+     * under the status bar and the gesture bar unless they are inset by hand.
+     */
+    private fun applyInsets() {
+        val gap = (12 * resources.displayMetrics.density).toInt()
+        ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            b.searchCard.updateLayoutParams<android.view.ViewGroup.MarginLayoutParams> {
+                topMargin = bars.top + gap
+            }
+            b.bottomCard.updateLayoutParams<android.view.ViewGroup.MarginLayoutParams> {
+                bottomMargin = bars.bottom + gap
+            }
+            insets
+        }
     }
 
     // -- map ----------------------------------------------------------------------------------
@@ -149,6 +176,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.btnSetup.setOnClickListener { showMenu() }
+
+        b.btnTrip.setOnClickListener {
+            val c = b.map.mapCenter
+            startActivity(
+                Intent(this, TripActivity::class.java)
+                    .putExtra(TripActivity.EXTRA_MAP_LAT, c.latitude)
+                    .putExtra(TripActivity.EXTRA_MAP_LON, c.longitude)
+            )
+        }
 
         b.searchBtn.setOnClickListener { runSearch() }
         b.searchInput.setOnEditorActionListener { _, actionId, _ ->
@@ -218,12 +254,38 @@ class MainActivity : AppCompatActivity() {
         b.btnToggle.setText(if (running) R.string.stop else R.string.start)
 
         val error = MockLocationService.lastError
+        val onTrip = running && Prefs.mode(this) == Prefs.MODE_TRIP
         b.tvStatus.text = when {
             error != null -> error
+            onTrip -> getString(R.string.status_trip)
             running -> getString(R.string.status_running)
             !isMockLocationApp() -> getString(R.string.err_not_mock_app)
             else -> getString(R.string.status_idle)
         }
+    }
+
+    /** Draws the saved trip's two legs so the schedule is visible on the map. */
+    private fun drawTripOverlay() {
+        routeOverlays.forEach { b.map.overlays.remove(it) }
+        routeOverlays.clear()
+
+        val trip = Trip.load(this) ?: run { b.map.invalidate(); return }
+
+        fun leg(encoded: String, colour: Int) {
+            val pts = Polyline.decode(encoded).map { GeoPoint(it[0], it[1]) }
+            if (pts.size < 2) return
+            val line = org.osmdroid.views.overlay.Polyline(b.map).apply {
+                setPoints(pts)
+                outlinePaint.color = colour
+                outlinePaint.strokeWidth = 10f
+            }
+            routeOverlays.add(line)
+            b.map.overlays.add(0, line)
+        }
+
+        leg(trip.outbound.polyline, 0xCC1E88E5.toInt())
+        leg(trip.inbound.polyline, 0x99FB8C00.toInt())
+        b.map.invalidate()
     }
 
     // -- system setup -------------------------------------------------------------------------
