@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "1.2",
-  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.2/GpsMock.apk",
-  "notes": "Fahrten-Simulation: Route von A nach B mit Auto/Fahrrad/Zu Fuss, taegliche Uhrzeiten fuer Hin- und Rueckweg. Fix: Suchleiste lag unter der Statusleiste und war nicht antippbar."
+  "versionCode": 4,
+  "versionName": "1.3",
+  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.3/GpsMock.apk",
+  "notes": "Kalender mit allen geplanten Fahrten. Wochentage frei waehlbar (Werktags, Wochenende, einzelne Tage). Karte oeffnet jetzt auf der eigenen Position. Benachrichtigungen bei gestoppter Simulation, entzogener Berechtigung und faelliger Fahrt. Optionaler Auto-Start zur Abfahrtszeit."
 }
