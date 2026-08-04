@@ -1,7 +1,12 @@
 package com.mooncity.gpsmock
 
+import android.app.AlarmManager
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -14,8 +19,11 @@ import com.mooncity.gpsmock.databinding.ActivityTripBinding
 import com.mooncity.gpsmock.route.Osrm
 import com.mooncity.gpsmock.route.Route
 import com.mooncity.gpsmock.route.TravelMode
+import com.mooncity.gpsmock.trip.Schedule
 import com.mooncity.gpsmock.trip.Trip
+import com.mooncity.gpsmock.trip.TripAlarms
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -63,13 +71,16 @@ class TripActivity : AppCompatActivity() {
         updateTimeLabels()
     }
 
+    private var hadExistingTrip = false
+
     private fun restoreExisting() {
         val trip = Trip.load(this) ?: return
+        hadExistingTrip = true
         startPoint = Place(trip.startName, trip.startLat, trip.startLon)
         endPoint = Place(trip.endName, trip.endLat, trip.endLon)
         outTime = trip.outTime
         returnTime = trip.returnTime
-        b.switchDaily.isChecked = trip.repeatDaily
+        applyDays(trip.days)
         b.modeGroup.check(
             when (trip.mode) {
                 TravelMode.CAR -> R.id.modeCar
@@ -84,6 +95,8 @@ class TripActivity : AppCompatActivity() {
 
     private fun wireUp() {
         if (b.modeGroup.checkedButtonId == View.NO_ID) b.modeGroup.check(R.id.modeBike)
+        // A brand new trip defaults to every day rather than to a silent one-off.
+        if (!hadExistingTrip) applyDays(DayOfWeek.entries.toSet()) else updateRepeatSummary()
 
         // Changing the profile invalidates whatever was routed before.
         b.modeGroup.addOnButtonCheckedListener { _, _, isChecked -> if (isChecked) invalidateRoute() }
@@ -108,7 +121,25 @@ class TripActivity : AppCompatActivity() {
 
         b.btnOutTime.setOnClickListener { pickTime(outTime) { outTime = it; updateTimeLabels(); invalidateRoute() } }
         b.btnReturnTime.setOnClickListener { pickTime(returnTime) { returnTime = it; updateTimeLabels(); invalidateRoute() } }
-        b.switchDaily.setOnCheckedChangeListener { _, _ -> }
+
+        b.presetDaily.setOnClickListener { applyDays(DayOfWeek.entries.toSet()) }
+        b.presetWeekdays.setOnClickListener {
+            applyDays(
+                setOf(
+                    DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                    DayOfWeek.THURSDAY, DayOfWeek.FRIDAY
+                )
+            )
+        }
+        b.presetWeekend.setOnClickListener { applyDays(setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)) }
+        b.presetOnce.setOnClickListener { applyDays(emptySet()) }
+        b.dayGroup.addOnButtonCheckedListener { _, _, _ -> updateRepeatSummary() }
+
+        b.switchAutoStart.isChecked = Prefs.autoStart(this)
+        b.switchAutoStart.setOnCheckedChangeListener { _, checked ->
+            Prefs.setAutoStart(this, checked)
+            if (checked) promptExactAlarmIfNeeded()
+        }
 
         b.btnRoute.setOnClickListener { calculateRoute() }
         b.btnSaveStart.setOnClickListener { activate(instant = false) }
@@ -121,6 +152,59 @@ class TripActivity : AppCompatActivity() {
         R.id.modeCar -> TravelMode.CAR
         R.id.modeFoot -> TravelMode.FOOT
         else -> TravelMode.BIKE
+    }
+
+    private val dayButtons by lazy {
+        listOf(
+            DayOfWeek.MONDAY to b.dayMo,
+            DayOfWeek.TUESDAY to b.dayTu,
+            DayOfWeek.WEDNESDAY to b.dayWe,
+            DayOfWeek.THURSDAY to b.dayTh,
+            DayOfWeek.FRIDAY to b.dayFr,
+            DayOfWeek.SATURDAY to b.daySa,
+            DayOfWeek.SUNDAY to b.daySu
+        )
+    }
+
+    private fun selectedDays(): Set<DayOfWeek> =
+        dayButtons.filter { it.second.isChecked }.map { it.first }.toSet()
+
+    private fun applyDays(days: Set<DayOfWeek>) {
+        dayButtons.forEach { (d, btn) ->
+            if (btn.isChecked != (d in days)) {
+                if (d in days) b.dayGroup.check(btn.id) else b.dayGroup.uncheck(btn.id)
+            }
+        }
+        updateRepeatSummary()
+    }
+
+    private fun updateRepeatSummary() {
+        b.repeatSummary.text = Schedule.label(selectedDays())
+    }
+
+    /**
+     * Without the exact-alarm grant the auto-start still works, it just drifts a few
+     * minutes, so this informs rather than blocks.
+     */
+    private fun promptExactAlarmIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val am = getSystemService(AlarmManager::class.java) ?: return
+        if (am.canScheduleExactAlarms()) return
+
+        AlertDialog.Builder(this)
+            .setMessage(R.string.trip_exact_alarm)
+            .setPositiveButton(R.string.trip_exact_alarm_open) { _, _ ->
+                runCatching {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                }
+            }
+            .setNegativeButton(R.string.later, null)
+            .show()
     }
 
     private fun pickTime(current: LocalTime, onPicked: (LocalTime) -> Unit) {
@@ -240,7 +324,7 @@ class TripActivity : AppCompatActivity() {
             endLat = e.lat, endLon = e.lon, endName = e.name,
             outTime = outTime,
             returnTime = returnTime,
-            repeatDaily = b.switchDaily.isChecked,
+            days = selectedDays(),
             outbound = out,
             inbound = back,
             createdAtMillis = System.currentTimeMillis(),
@@ -249,6 +333,7 @@ class TripActivity : AppCompatActivity() {
 
         Trip.save(this, trip)
         Prefs.setMode(this, Prefs.MODE_TRIP)
+        TripAlarms.reschedule(this)
         MockLocationService.startTrip(this)
         toast(getString(R.string.trip_saved))
         finish()

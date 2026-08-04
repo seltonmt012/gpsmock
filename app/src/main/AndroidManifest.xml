@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
         tools:ignore="BatteryLife" />
@@ -49,6 +50,11 @@
             android:label="@string/trip_title"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ScheduleActivity"
+            android:exported="false"
+            android:label="@string/schedule_title" />
+
         <service
             android:name=".MockLocationService"
             android:exported="false"
@@ -66,6 +72,11 @@
 
         <receiver
             android:name=".update.InstallReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".trip.TripAlarmReceiver"
             android:enabled="true"
             android:exported="false" />
     </application>

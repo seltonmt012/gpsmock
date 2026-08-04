@@ -53,30 +53,16 @@ class TripSource(private val trip: Trip) {
         val zone = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
 
-        val anchor: Long
-        val retStartMs: Long
-        if (trip.repeatDaily) {
-            // Rolling window: the most recent departure at or before now.
-            var outStart = now.toLocalDate().atTime(trip.outTime).atZone(zone)
-            if (now.isBefore(outStart)) outStart = outStart.minusDays(1)
-            var ret = outStart.toLocalDate().atTime(trip.returnTime).atZone(zone)
-            if (!ret.isAfter(outStart)) ret = ret.plusDays(1)
-            anchor = outStart.toInstant().toEpochMilli()
-            retStartMs = ret.toInstant().toEpochMilli()
-        } else {
-            // Fixed window: the single cycle following the moment the trip was created.
-            val created = Instant.ofEpochMilli(trip.createdAtMillis).atZone(zone)
-            var outStart = created.toLocalDate().atTime(trip.outTime).atZone(zone)
-            if (outStart.isBefore(created)) outStart = outStart.plusDays(1)
-            var ret = outStart.toLocalDate().atTime(trip.returnTime).atZone(zone)
-            if (!ret.isAfter(outStart)) ret = ret.plusDays(1)
-            anchor = outStart.toInstant().toEpochMilli()
-            retStartMs = ret.toInstant().toEpochMilli()
+        // Before the very first departure there is nothing to replay yet.
+        val occ = Schedule.currentOccurrence(trip, now)
+            ?: return stay(trip.startLat, trip.startLon, Phase.AT_START)
 
-            if (nowMillis < anchor) return stay(trip.startLat, trip.startLon, Phase.AT_START)
-            if (nowMillis >= retStartMs + inDurMs) {
-                return stay(trip.startLat, trip.startLon, Phase.FINISHED)
-            }
+        val anchor = occ.outStart.toInstant().toEpochMilli()
+        val retStartMs = occ.returnStart.toInstant().toEpochMilli()
+
+        // A one-off trip has nothing after its single return leg.
+        if (trip.days.isEmpty() && nowMillis >= retStartMs + inDurMs) {
+            return stay(trip.startLat, trip.startLon, Phase.FINISHED)
         }
 
         val outEndMs = anchor + outDurMs

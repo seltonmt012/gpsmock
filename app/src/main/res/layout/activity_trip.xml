@@ -155,13 +155,122 @@
                 android:text="@string/trip_return_time" />
         </LinearLayout>
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchDaily"
+        <TextView
+            style="@style/SectionLabel"
+            android:text="@string/trip_repeat" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:checked="true"
-            android:text="@string/trip_daily" />
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/presetDaily"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:minWidth="0dp"
+                android:text="@string/preset_daily"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/presetWeekdays"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:minWidth="0dp"
+                android:text="@string/preset_weekdays"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/presetWeekend"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:minWidth="0dp"
+                android:text="@string/preset_weekend"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/presetOnce"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:minWidth="0dp"
+                android:text="@string/preset_once"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/dayGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="false">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dayMo"
+                style="@style/DayToggle"
+                android:text="@string/day_mo" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dayTu"
+                style="@style/DayToggle"
+                android:text="@string/day_tu" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dayWe"
+                style="@style/DayToggle"
+                android:text="@string/day_we" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dayTh"
+                style="@style/DayToggle"
+                android:text="@string/day_th" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dayFr"
+                style="@style/DayToggle"
+                android:text="@string/day_fr" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/daySa"
+                style="@style/DayToggle"
+                android:text="@string/day_sa" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/daySu"
+                style="@style/DayToggle"
+                android:text="@string/day_su" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/repeatSummary"
+            style="@style/ResolvedLabel"
+            android:layout_marginTop="8dp" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchAutoStart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/trip_autostart" />
+
+        <TextView
+            style="@style/ResolvedLabel"
+            android:text="@string/trip_autostart_hint" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRoute"

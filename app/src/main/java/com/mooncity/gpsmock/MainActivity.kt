@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -30,6 +33,8 @@ import com.mooncity.gpsmock.update.UpdateChecker
 import com.mooncity.gpsmock.update.UpdateInfo
 import com.mooncity.gpsmock.route.Polyline
 import com.mooncity.gpsmock.trip.Trip
+import com.mooncity.gpsmock.trip.TripAlarms
+import com.mooncity.gpsmock.trip.TripSource
 import com.mooncity.gpsmock.update.Updater
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
@@ -40,6 +45,8 @@ import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -53,7 +60,16 @@ class MainActivity : AppCompatActivity() {
     /** One silent check per app launch; manual checks go through the menu. */
     private var updateCheckedThisLaunch = false
 
-    private val routeOverlays = mutableListOf<org.osmdroid.views.overlay.Overlay>()
+    private val routeOverlays = mutableListOf<Overlay>()
+    private val markerOverlays = mutableListOf<Overlay>()
+
+    /** Keeps the mock marker moving along a running trip while the map is on screen. */
+    private val markerTicker = object : Runnable {
+        override fun run() {
+            refreshMarkers()
+            b.root.postDelayed(this, 2_000)
+        }
+    }
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = refreshUi()
@@ -91,16 +107,25 @@ class MainActivity : AppCompatActivity() {
         b.map.onResume()
         LocalBroadcastManager.getInstance(this)
             .registerReceiver(statusReceiver, IntentFilter(MockLocationService.BROADCAST_STATUS))
+        // A force-stop clears pending alarms, so re-arm whenever the app is opened.
+        TripAlarms.reschedule(this)
+
         refreshUi()
         drawTripOverlay()
+        refreshMarkers()
+        b.root.removeCallbacks(markerTicker)
+        b.root.postDelayed(markerTicker, 2_000)
 
         if (!updateCheckedThisLaunch) {
             updateCheckedThisLaunch = true
             checkForUpdate(silent = true)
+            // Open on the user's own position, the way a map app is expected to.
+            locateSelf(recenter = !MockLocationService.isRunning)
         }
     }
 
     override fun onPause() {
+        b.root.removeCallbacks(markerTicker)
         LocalBroadcastManager.getInstance(this).unregisterReceiver(statusReceiver)
         val c = b.map.mapCenter
         Prefs.saveTarget(this, c.latitude, c.longitude)
@@ -185,6 +210,10 @@ class MainActivity : AppCompatActivity() {
                     .putExtra(TripActivity.EXTRA_MAP_LON, c.longitude)
             )
         }
+
+        b.btnSchedule.setOnClickListener { startActivity(Intent(this, ScheduleActivity::class.java)) }
+
+        b.fabLocate.setOnClickListener { locateSelf(recenter = true) }
 
         b.searchBtn.setOnClickListener { runSearch() }
         b.searchInput.setOnEditorActionListener { _, actionId, _ ->
@@ -385,6 +414,138 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.later, null)
             .show()
+    }
+
+    // -- own position -------------------------------------------------------------------------
+
+    /**
+     * Shows where the phone really is.
+     *
+     * Only possible while the mock is off: the test providers replace the real ones system
+     * wide, including for this app, so during a session the best available answer is the
+     * fix captured before it started.
+     */
+    private fun locateSelf(recenter: Boolean) {
+        if (!hasLocationPermission()) {
+            requestPermissions()
+            return
+        }
+
+        if (MockLocationService.isRunning) {
+            toast(getString(R.string.real_hidden_while_mocking))
+            if (recenter) currentMockPoint()?.let { b.map.controller.animateTo(it) }
+            return
+        }
+
+        val lm = getSystemService(LocationManager::class.java) ?: return
+
+        lastKnown(lm)?.let { store(it, recenter) }
+        requestFreshFix(lm, recenter)
+    }
+
+    private fun lastKnown(lm: LocationManager): Location? = try {
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+    } catch (e: SecurityException) {
+        null
+    }
+
+    private fun requestFreshFix(lm: LocationManager, recenter: Boolean) {
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                runCatching { lm.removeUpdates(this) }
+                store(location, recenter)
+            }
+
+            @Deprecated("Required on API < 29")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+
+            override fun onProviderDisabled(provider: String) = Unit
+            override fun onProviderEnabled(provider: String) = Unit
+        }
+
+        try {
+            b.tvStatus.text = getString(R.string.locating)
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, listener, mainLooper)
+            lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 0f, listener, mainLooper)
+            // Give up after a while rather than draining the battery on a hopeless fix.
+            b.root.postDelayed({
+                runCatching { lm.removeUpdates(listener) }
+                refreshUi()
+            }, 20_000)
+        } catch (e: SecurityException) {
+            refreshUi()
+        }
+    }
+
+    private fun store(location: Location, recenter: Boolean) {
+        Prefs.saveRealFix(this, location.latitude, location.longitude, System.currentTimeMillis())
+        if (recenter) {
+            b.map.controller.setZoom(16.5)
+            b.map.controller.animateTo(GeoPoint(location.latitude, location.longitude))
+        }
+        refreshMarkers()
+        refreshUi()
+    }
+
+    /** Where the mock currently claims to be — computed from the clock for trips. */
+    private fun currentMockPoint(): GeoPoint? {
+        if (!MockLocationService.isRunning) return null
+        if (Prefs.mode(this) == Prefs.MODE_TRIP) {
+            val trip = Trip.load(this) ?: return null
+            val fix = TripSource(trip).fixAt(System.currentTimeMillis())
+            return GeoPoint(fix.lat, fix.lon)
+        }
+        return GeoPoint(Prefs.lat(this), Prefs.lon(this))
+    }
+
+    private fun refreshMarkers() {
+        markerOverlays.forEach { b.map.overlays.remove(it) }
+        markerOverlays.clear()
+
+        val mocking = MockLocationService.isRunning
+
+        Prefs.realFix(this)?.let { (lat, lon, at) ->
+            val marker = Marker(b.map).apply {
+                position = GeoPoint(lat, lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = ContextCompat.getDrawable(
+                    this@MainActivity,
+                    if (mocking) R.drawable.ic_dot_stale else R.drawable.ic_dot_real
+                )
+                title = if (mocking) {
+                    getString(R.string.real_position_stale, timeAgo(at))
+                } else {
+                    getString(R.string.locate)
+                }
+            }
+            markerOverlays.add(marker)
+            b.map.overlays.add(marker)
+        }
+
+        currentMockPoint()?.let { p ->
+            val marker = Marker(b.map).apply {
+                position = p
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_mock_pin)
+                title = getString(R.string.status_running)
+            }
+            markerOverlays.add(marker)
+            b.map.overlays.add(marker)
+        }
+
+        b.map.invalidate()
+    }
+
+    private fun timeAgo(at: Long): String {
+        val mins = ((System.currentTimeMillis() - at) / 60_000L).toInt()
+        return when {
+            mins < 1 -> "gerade eben"
+            mins < 60 -> "vor $mins min"
+            mins < 1440 -> "vor ${mins / 60} h"
+            else -> "vor ${mins / 1440} d"
+        }
     }
 
     // -- updates ------------------------------------------------------------------------------

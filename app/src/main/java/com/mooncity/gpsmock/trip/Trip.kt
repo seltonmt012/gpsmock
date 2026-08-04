@@ -3,12 +3,15 @@ package com.mooncity.gpsmock.trip
 import android.content.Context
 import com.mooncity.gpsmock.route.Route
 import com.mooncity.gpsmock.route.TravelMode
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.DayOfWeek
 import java.time.LocalTime
 
 /**
- * A there-and-back journey on a daily clock: leave [outTime], come back at [returnTime].
+ * A there-and-back journey on a weekly schedule: leave at [outTime], come back at
+ * [returnTime], on the weekdays in [days]. An empty [days] means the trip runs once.
  *
  * Both legs are routed separately rather than reversing one geometry, because one-way
  * streets make the way home a different path.
@@ -23,7 +26,7 @@ data class Trip(
     val endName: String,
     val outTime: LocalTime,
     val returnTime: LocalTime,
-    val repeatDaily: Boolean,
+    val days: Set<DayOfWeek>,
     val outbound: Route,
     val inbound: Route,
     val createdAtMillis: Long,
@@ -41,7 +44,7 @@ data class Trip(
         put("endName", endName)
         put("outTime", outTime.toString())
         put("returnTime", returnTime.toString())
-        put("repeatDaily", repeatDaily)
+        put("days", JSONArray().apply { days.sorted().forEach { put(it.value) } })
         put("outPolyline", outbound.polyline)
         put("outDistance", outbound.distanceMeters)
         put("outDuration", outbound.durationSeconds)
@@ -75,7 +78,7 @@ data class Trip(
                     endName = o.optString("endName"),
                     outTime = LocalTime.parse(o.getString("outTime")),
                     returnTime = LocalTime.parse(o.getString("returnTime")),
-                    repeatDaily = o.optBoolean("repeatDaily", true),
+                    days = readDays(o),
                     outbound = Route(
                         o.getString("outPolyline"),
                         o.optDouble("outDistance", 0.0),
@@ -92,6 +95,18 @@ data class Trip(
             } catch (e: Exception) {
                 null
             }
+        }
+
+        /** Reads the weekday set, falling back to the boolean flag written by 1.2. */
+        private fun readDays(o: JSONObject): Set<DayOfWeek> {
+            o.optJSONArray("days")?.let { arr ->
+                val set = mutableSetOf<DayOfWeek>()
+                for (i in 0 until arr.length()) {
+                    runCatching { set.add(DayOfWeek.of(arr.getInt(i))) }
+                }
+                return set
+            }
+            return if (o.optBoolean("repeatDaily", true)) DayOfWeek.entries.toSet() else emptySet()
         }
 
         fun clear(ctx: Context) {

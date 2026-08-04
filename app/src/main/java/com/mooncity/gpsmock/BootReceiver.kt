@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.mooncity.gpsmock.trip.TripAlarms
 
 /**
  * Restores the previous session after a reboot or an app update.
@@ -23,6 +24,9 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
+        // Alarms do not survive a reboot, so re-arm the schedule regardless of mock state.
+        TripAlarms.reschedule(context)
+
         if (!Prefs.isActive(context)) return
 
         val lat = Prefs.lat(context)

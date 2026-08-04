@@ -13,6 +13,10 @@ object Prefs {
     private const val KEY_ACCURACY = "accuracy"
     private const val KEY_JITTER = "jitter"
     private const val KEY_MODE = "mode"
+    private const val KEY_AUTOSTART = "autoStart"
+    private const val KEY_REAL_LAT = "realLat"
+    private const val KEY_REAL_LON = "realLon"
+    private const val KEY_REAL_AT = "realAt"
 
     const val MODE_STATIC = "static"
     const val MODE_TRIP = "trip"
@@ -45,6 +49,29 @@ object Prefs {
     /** Which position source the service should use: a fixed point or a scheduled trip. */
     fun mode(ctx: Context): String = sp(ctx).getString(KEY_MODE, MODE_STATIC) ?: MODE_STATIC
     fun setMode(ctx: Context, mode: String) = sp(ctx).edit().putString(KEY_MODE, mode).apply()
+
+    /** Whether a scheduled departure may start the service on its own. */
+    fun autoStart(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_AUTOSTART, false)
+    fun setAutoStart(ctx: Context, v: Boolean) = sp(ctx).edit().putBoolean(KEY_AUTOSTART, v).apply()
+
+    /** Last position read from the real GPS, kept because mocking hides it afterwards. */
+    fun saveRealFix(ctx: Context, lat: Double, lon: Double, atMillis: Long) {
+        sp(ctx).edit()
+            .putLong(KEY_REAL_LAT, java.lang.Double.doubleToRawLongBits(lat))
+            .putLong(KEY_REAL_LON, java.lang.Double.doubleToRawLongBits(lon))
+            .putLong(KEY_REAL_AT, atMillis)
+            .apply()
+    }
+
+    fun realFix(ctx: Context): Triple<Double, Double, Long>? {
+        val at = sp(ctx).getLong(KEY_REAL_AT, 0L)
+        if (at == 0L) return null
+        return Triple(
+            java.lang.Double.longBitsToDouble(sp(ctx).getLong(KEY_REAL_LAT, 0L)),
+            java.lang.Double.longBitsToDouble(sp(ctx).getLong(KEY_REAL_LON, 0L)),
+            at
+        )
+    }
 
     /** Reported horizontal accuracy in metres. Lower looks like a strong GPS fix. */
     fun accuracy(ctx: Context): Float = sp(ctx).getFloat(KEY_ACCURACY, 4f)

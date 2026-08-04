@@ -202,10 +202,13 @@ class MockLocationService : Service() {
             Prefs.setActive(this, false)
             isRunning = false
             broadcastStatus()
+            Notifier.mockStopped(this, lastError ?: getString(R.string.err_unknown))
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
         }
+        Notifier.clear(this, Notifier.ID_STOPPED)
+        Notifier.clear(this, Notifier.ID_TRIP_DUE)
 
         if (wakeLock == null) {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -311,6 +314,7 @@ class MockLocationService : Service() {
                 Prefs.setActive(this, false)
                 stopMocking()
                 broadcastStatus()
+                Notifier.tripFinished(this)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return
@@ -350,6 +354,7 @@ class MockLocationService : Service() {
                 stopMocking()
                 Prefs.setActive(this, false)
                 broadcastStatus()
+                Notifier.permissionLost(this)
                 notifyForeground()
                 return
             }

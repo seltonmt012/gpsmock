@@ -53,7 +53,55 @@
     <string name="trip_times">Uhrzeiten</string>
     <string name="trip_out_time">Hin: %1$s</string>
     <string name="trip_return_time">Zurück: %1$s</string>
-    <string name="trip_daily">Jeden Tag wiederholen</string>
+    <string name="trip_repeat">Wiederholung</string>
+    <string name="preset_daily">Täglich</string>
+    <string name="preset_weekdays">Werktags</string>
+    <string name="preset_weekend">Wochenende</string>
+    <string name="preset_once">Einmalig</string>
+    <string name="day_mo">Mo</string>
+    <string name="day_tu">Di</string>
+    <string name="day_we">Mi</string>
+    <string name="day_th">Do</string>
+    <string name="day_fr">Fr</string>
+    <string name="day_sa">Sa</string>
+    <string name="day_su">So</string>
+    <string name="trip_autostart">Automatisch starten</string>
+    <string name="trip_autostart_hint">Startet die Simulation kurz vor der Abfahrt von selbst. Android blockt Hintergrund-Starts manchmal — dann kommt stattdessen eine Benachrichtigung zum Antippen.</string>
+    <string name="trip_exact_alarm">Für pünktlichen Auto-Start braucht die App die Berechtigung „Wecker und Erinnerungen“. Ohne sie startet die Fahrt eventuell ein paar Minuten zu spät.</string>
+    <string name="trip_exact_alarm_open">Berechtigung öffnen</string>
+
+    <string name="schedule">Kalender</string>
+    <string name="schedule_title">Fahrtenkalender</string>
+    <string name="schedule_none">Noch keine Fahrt eingeplant.</string>
+    <string name="schedule_create">Fahrt anlegen</string>
+    <string name="schedule_edit">Fahrt bearbeiten</string>
+    <string name="schedule_delete">Fahrt löschen</string>
+    <string name="schedule_delete_msg">Die geplante Fahrt wird entfernt. Läuft sie gerade, wird die Simulation gestoppt.</string>
+    <string name="schedule_headline">%1$s → %2$s\n%3$s · ab %4$s, zurück %5$s</string>
+    <string name="schedule_legend">Blau = Fahrtag · roter Ring = heute</string>
+    <string name="schedule_upcoming">Nächste Fahrten</string>
+    <string name="schedule_no_upcoming">Keine weiteren Fahrten.</string>
+    <string name="schedule_entry">%1$s   %2$s → %3$s   ·   zurück %4$s → %5$s</string>
+    <string name="nav_prev">‹</string>
+    <string name="nav_next">›</string>
+
+    <string name="channel_events_name">Hinweise</string>
+    <string name="channel_events_desc">Meldet gestoppte Simulation, Fehler und fällige Fahrten</string>
+    <string name="notify_stopped_title">Simulation gestoppt</string>
+    <string name="notify_permission_title">Berechtigung entzogen</string>
+    <string name="notify_permission_text">Android hat die Simulations-Berechtigung entzogen. In den Entwickleroptionen wieder „GPS Mock“ auswählen.</string>
+    <string name="notify_trip_due_title">Fahrt steht an</string>
+    <string name="notify_trip_due_text">Abfahrt %1$s, aber die Simulation läuft nicht. Zum Starten tippen.</string>
+    <string name="notify_autostart_blocked_title">Auto-Start blockiert</string>
+    <string name="notify_autostart_blocked_text">Android hat den Start im Hintergrund verweigert. Zum Starten tippen.</string>
+    <string name="notify_trip_done_title">Fahrt beendet</string>
+    <string name="notify_trip_done_text">Die einmalige Fahrt ist durch, die Simulation wurde gestoppt.</string>
+
+    <string name="locate">Standort</string>
+    <string name="locating">Standort wird gesucht…</string>
+    <string name="locate_failed">Kein Standort verfügbar</string>
+    <string name="real_position_stale">Echte Position von %1$s (vor dem Mock)</string>
+    <string name="real_hidden_while_mocking">Während der Simulation ist die echte Position nicht abrufbar.</string>
     <string name="trip_calc">Route berechnen</string>
     <string name="trip_activate">Fahrt aktivieren</string>
     <string name="trip_test_now">Jetzt sofort testen (einmalig)</string>
