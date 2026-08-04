@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1",
-  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.1/GpsMock.apk",
-  "notes": "Erste signierte Version.\n\n- Fix: App erscheint jetzt in den Entwickleroptionen unter \"App für simulierte Standorte auswählen\"\n- Neu: Update-Prüfung beim App-Start"
+  "versionCode": 3,
+  "versionName": "1.2",
+  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.2/GpsMock.apk",
+  "notes": "Fahrten-Simulation: Route von A nach B mit Auto/Fahrrad/Zu Fuss, taegliche Uhrzeiten fuer Hin- und Rueckweg. Fix: Suchleiste lag unter der Statusleiste und war nicht antippbar."
 }
