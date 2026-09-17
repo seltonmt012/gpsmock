@@ -15,6 +15,7 @@
     <string name="status_running">Aktiv – Position wird gesendet</string>
     <string name="status_idle">Karte verschieben, dann Start</string>
     <string name="status_trip_paused">Pausiert – echter Standort aktiv · nächste Fahrt %1$s</string>
+    <string name="status_overridden">Achtung: Android gibt eine andere Position heraus</string>
 
     <string name="channel_name">Standort-Simulation</string>
     <string name="channel_desc">Läuft, solange eine Position simuliert wird</string>
@@ -23,6 +24,8 @@
     <string name="notif_title">GPS Mock aktiv</string>
     <string name="notif_error">GPS Mock gestoppt</string>
     <string name="notif_paused">GPS Mock pausiert</string>
+    <string name="notif_overridden">Simulation kommt nicht an</string>
+    <string name="notif_overridden_text">Android gibt trotz laufender Simulation eine andere Position heraus. Meist liegt es an „Google-Standortgenauigkeit“ — zum Prüfen tippen.</string>
     <string name="notif_paused_text">Außerhalb der Fahrzeiten – dein echter Standort ist wieder sichtbar. Nächste Fahrt: %1$s</string>
     <string name="notif_text">%1$.6f, %2$.6f</string>
     <string name="action_stop">Stopp</string>
@@ -104,6 +107,8 @@
     <string name="notify_trip_due_text">Abfahrt %1$s, aber die Simulation läuft nicht. Zum Starten tippen.</string>
     <string name="notify_autostart_blocked_title">Auto-Start blockiert</string>
     <string name="notify_autostart_blocked_text">Android hat den Start im Hintergrund verweigert. Zum Starten tippen.</string>
+    <string name="notify_overridden_title">Simulation wirkt nicht</string>
+    <string name="notify_overridden_text">Die App sendet, aber Android gibt eine andere Position heraus. Prüfe: Einstellungen → Standort → Standortdienste → „Google-Standortgenauigkeit“ aus. Auch Akku-Optimierung oder eine zweite Simulations-App können die Ursache sein.</string>
     <string name="notify_trip_done_title">Fahrt beendet</string>
     <string name="notify_trip_done_text">Die einmalige Fahrt ist durch, die Simulation wurde gestoppt.</string>
 

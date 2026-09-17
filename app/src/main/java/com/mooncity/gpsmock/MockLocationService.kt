@@ -19,6 +19,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.mooncity.gpsmock.route.Geo
 import com.mooncity.gpsmock.trip.Fix
 import com.mooncity.gpsmock.trip.Phase
 import com.mooncity.gpsmock.trip.Schedule
@@ -68,6 +69,13 @@ class MockLocationService : Service() {
          */
         private const val IDLE_INTERVAL_MS = 30_000L
 
+        /**
+         * Wie oft zurückgelesen wird, was das System tatsächlich herausgibt. Selten genug,
+         * um nicht ins Gewicht zu fallen, oft genug, um einen Aussetzer in wenigen Minuten
+         * zu bemerken.
+         */
+        private const val VERIFY_INTERVAL_MS = 60_000L
+
         /** ~1.2 m of wobble, so the position is not suspiciously frozen. */
         private const val JITTER_DEG = 0.000011
 
@@ -91,6 +99,15 @@ class MockLocationService : Service() {
 
         /** True only while fixes are actually being injected. */
         val isMocking: Boolean get() = isRunning && !isPaused
+
+        /**
+         * Gesetzt, solange das System etwas anderes herausgibt, als hier gesetzt wird.
+         * Kein Fehler im Sinne von [lastError]: die App läuft weiter und versucht es
+         * weiter, nur wirkt es gerade nicht.
+         */
+        @Volatile
+        var isOverridden = false
+            private set
 
         @Volatile
         var lastError: String? = null
@@ -159,6 +176,8 @@ class MockLocationService : Service() {
     @Volatile private var tripSource: TripSource? = null
     @Volatile private var phaseLabel: String? = null
     private var lastNotifUpdate = 0L
+    private var lastVerify = 0L
+    private val drift = DriftMonitor()
     private val registered = mutableSetOf<String>()
 
     /**
@@ -265,6 +284,7 @@ class MockLocationService : Service() {
 
         lastError = null
         isPaused = false
+        resetVerification()
         Notifier.clear(this, Notifier.ID_STOPPED)
         Notifier.clear(this, Notifier.ID_TRIP_DUE)
 
@@ -317,6 +337,7 @@ class MockLocationService : Service() {
         unregisterProviders()
         releaseWakeLock()
         TripAlarms.cancelResume(this)
+        resetVerification()
 
         trip = null
         tripSource = null
@@ -338,6 +359,14 @@ class MockLocationService : Service() {
     private fun releaseWakeLock() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+    }
+
+    /** Beim Start, beim Pausieren und beim Stoppen gilt das bisher Beobachtete nicht mehr. */
+    private fun resetVerification() {
+        drift.reset()
+        isOverridden = false
+        lastVerify = 0L
+        Notifier.clear(this, Notifier.ID_OVERRIDDEN)
     }
 
     // -- the window ---------------------------------------------------------------------------
@@ -391,6 +420,8 @@ class MockLocationService : Service() {
 
         unregisterProviders()
         releaseWakeLock()
+        // Pausiert wird nichts gesetzt, also gibt es auch nichts zu überwachen.
+        resetVerification()
 
         val next = trip?.let { Schedule.nextDeparture(it, ZonedDateTime.now(Schedule.zone())) }
         resumeAtMillis = next?.toInstant()?.toEpochMilli() ?: 0L
@@ -418,6 +449,7 @@ class MockLocationService : Service() {
         }
 
         lastError = null
+        resetVerification()
         if (!registerProviders()) {
             failAndStop()
             return false
@@ -539,6 +571,53 @@ class MockLocationService : Service() {
                 return
             }
         }
+
+        verifyOccasionally(snapshotLat, snapshotLon, now)
+    }
+
+    // -- Rückkanal ----------------------------------------------------------------------------
+
+    /**
+     * Liest zurück, was das System herausgibt, und vergleicht es mit dem, was gerade gesetzt
+     * wurde. Ohne das bliebe ein stilles Überschreiben - eingeschaltete Google-Standort-
+     * genauigkeit, eine Hersteller-Eigenheit - unbemerkt, weil dabei keine Exception fliegt.
+     */
+    private fun verifyOccasionally(expectedLat: Double, expectedLon: Double, now: Long) {
+        if (now - lastVerify < VERIFY_INTERVAL_MS) return
+        lastVerify = now
+
+        val loc = readBack() ?: return
+        val age = (SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+        val mocked = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            loc.isMock
+        } else {
+            @Suppress("DEPRECATION")
+            loc.isFromMockProvider
+        }
+        val distance = Geo.distanceMeters(loc.latitude, loc.longitude, expectedLat, expectedLon)
+
+        val verdict = MockCheck.verdict(age, mocked, distance)
+        if (!drift.record(verdict)) return
+
+        isOverridden = drift.isFailing
+        if (isOverridden) {
+            Log.w(TAG, "override erkannt: mock=$mocked, abstand=${distance.toInt()} m, alter=$age ms")
+            Notifier.mockOverridden(this)
+        } else {
+            Log.i(TAG, "simulation kommt wieder an")
+            Notifier.clear(this, Notifier.ID_OVERRIDDEN)
+        }
+        notifyForeground()
+        broadcastStatus()
+    }
+
+    /** Die frischeste Position, die das System zu den benutzten Providern kennt. */
+    private fun readBack(): Location? = try {
+        registered.toList()
+            .mapNotNull { runCatching { locationManager.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.elapsedRealtimeNanos }
+    } catch (e: SecurityException) {
+        null
     }
 
     private fun buildLocation(
@@ -618,11 +697,13 @@ class MockLocationService : Service() {
         val text = when {
             lastError != null -> lastError!!
             isPaused -> getString(R.string.notif_paused_text, nextWindowLabel())
+            isOverridden -> getString(R.string.notif_overridden_text)
             else -> phaseLabel ?: getString(R.string.notif_text, lat, lon)
         }
         val title = when {
             lastError != null -> R.string.notif_error
             isPaused -> R.string.notif_paused
+            isOverridden -> R.string.notif_overridden
             else -> R.string.notif_title
         }
 

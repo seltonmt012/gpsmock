@@ -19,6 +19,7 @@ object Notifier {
     const val ID_ERROR = 5002
     const val ID_TRIP_DUE = 5003
     const val ID_TRIP_DONE = 5004
+    const val ID_OVERRIDDEN = 5005
 
     private fun manager(ctx: Context): NotificationManager {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -94,6 +95,18 @@ object Notifier {
         ctx.getString(R.string.notify_autostart_blocked_title),
         ctx.getString(R.string.notify_autostart_blocked_text),
         openApp(ctx, 13, autostart = true)
+    )
+
+    /**
+     * Die App setzt weiter Positionen, aber das System gibt etwas anderes heraus. Das
+     * merkt sonst niemand, weil nach außen einfach die echte Position steht.
+     */
+    fun mockOverridden(ctx: Context) = post(
+        ctx,
+        ID_OVERRIDDEN,
+        ctx.getString(R.string.notify_overridden_title),
+        ctx.getString(R.string.notify_overridden_text),
+        openApp(ctx, 15)
     )
 
     fun tripFinished(ctx: Context) = post(

@@ -1,12 +1,9 @@
 package com.mooncity.gpsmock.trip
 
+import com.mooncity.gpsmock.route.Geo
 import com.mooncity.gpsmock.route.Polyline
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 enum class Phase { OUTBOUND, AT_DESTINATION, INBOUND, AT_START, FINISHED }
 
@@ -138,7 +135,7 @@ class TripSource(private val trip: Trip) {
         val lat = a[0] + (b[0] - a[0]) * t
         val lon = a[1] + (b[1] - a[1]) * t
 
-        return Fix(lat, lon, bearing(a[0], a[1], b[0], b[1]), speed, phase, f.toFloat())
+        return Fix(lat, lon, Geo.bearingDegrees(a[0], a[1], b[0], b[1]), speed, phase, f.toFloat())
     }
 
     private fun speedOf(distance: Double, duration: Double): Float =
@@ -147,30 +144,9 @@ class TripSource(private val trip: Trip) {
     private fun cumulative(pts: List<DoubleArray>): DoubleArray {
         val out = DoubleArray(pts.size)
         for (i in 1 until pts.size) {
-            out[i] = out[i - 1] + haversine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1])
+            out[i] = out[i - 1] +
+                    Geo.distanceMeters(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1])
         }
         return out
-    }
-
-    private companion object {
-        const val EARTH_R = 6_371_000.0
-
-        fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-            val dLat = Math.toRadians(lat2 - lat1)
-            val dLon = Math.toRadians(lon2 - lon1)
-            val a = sin(dLat / 2) * sin(dLat / 2) +
-                    cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                    sin(dLon / 2) * sin(dLon / 2)
-            return 2 * EARTH_R * atan2(sqrt(a), sqrt(1 - a))
-        }
-
-        fun bearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
-            val p1 = Math.toRadians(lat1)
-            val p2 = Math.toRadians(lat2)
-            val dl = Math.toRadians(lon2 - lon1)
-            val y = sin(dl) * cos(p2)
-            val x = cos(p1) * sin(p2) - sin(p1) * cos(p2) * cos(dl)
-            return ((Math.toDegrees(atan2(y, x)) + 360.0) % 360.0).toFloat()
-        }
     }
 }

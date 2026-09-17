@@ -296,6 +296,7 @@ class MainActivity : AppCompatActivity() {
         val onTrip = running && Prefs.mode(this) == Prefs.MODE_TRIP
         b.tvStatus.text = when {
             error != null -> error
+            running && MockLocationService.isOverridden -> getString(R.string.status_overridden)
             running && MockLocationService.isPaused ->
                 getString(R.string.status_trip_paused, nextWindowLabel())
 
