@@ -14,6 +14,7 @@
 
     <string name="status_running">Aktiv – Position wird gesendet</string>
     <string name="status_idle">Karte verschieben, dann Start</string>
+    <string name="status_trip_paused">Pausiert – echter Standort aktiv · nächste Fahrt %1$s</string>
 
     <string name="channel_name">Standort-Simulation</string>
     <string name="channel_desc">Läuft, solange eine Position simuliert wird</string>
@@ -21,6 +22,8 @@
 
     <string name="notif_title">GPS Mock aktiv</string>
     <string name="notif_error">GPS Mock gestoppt</string>
+    <string name="notif_paused">GPS Mock pausiert</string>
+    <string name="notif_paused_text">Außerhalb der Fahrzeiten – dein echter Standort ist wieder sichtbar. Nächste Fahrt: %1$s</string>
     <string name="notif_text">%1$.6f, %2$.6f</string>
     <string name="action_stop">Stopp</string>
 
@@ -69,6 +72,9 @@
     <string name="day_fr">Fr</string>
     <string name="day_sa">Sa</string>
     <string name="day_su">So</string>
+    <string name="trip_pause_outside">Außerhalb der Fahrzeiten pausieren</string>
+    <string name="trip_pause_outside_hint">Zwischen Rückkehr und nächster Abfahrt wird nichts simuliert — Android liefert so lange wieder deine echte Position. Aus heißt: rund um die Uhr wird der Startpunkt gesendet.</string>
+    <string name="trip_next_none">keine geplant</string>
     <string name="trip_autostart">Automatisch starten</string>
     <string name="trip_autostart_hint">Startet die Simulation kurz vor der Abfahrt von selbst. Android blockt Hintergrund-Starts manchmal — dann kommt stattdessen eine Benachrichtigung zum Antippen.</string>
     <string name="trip_exact_alarm">Für pünktlichen Auto-Start braucht die App die Berechtigung „Wecker und Erinnerungen“. Ohne sie startet die Fahrt eventuell ein paar Minuten zu spät.</string>
@@ -106,6 +112,7 @@
     <string name="locate_failed">Kein Standort verfügbar</string>
     <string name="real_position_stale">Echte Position von %1$s (vor dem Mock)</string>
     <string name="real_hidden_while_mocking">Während der Simulation ist die echte Position nicht abrufbar.</string>
+    <string name="real_position_live">Dein echter Standort</string>
     <string name="trip_calc">Route berechnen</string>
     <string name="trip_activate">Fahrt aktivieren</string>
     <string name="trip_test_now">Jetzt sofort testen (einmalig)</string>

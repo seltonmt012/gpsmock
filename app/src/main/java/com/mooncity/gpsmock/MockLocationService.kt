@@ -21,8 +21,12 @@ import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.mooncity.gpsmock.trip.Fix
 import com.mooncity.gpsmock.trip.Phase
+import com.mooncity.gpsmock.trip.Schedule
 import com.mooncity.gpsmock.trip.Trip
+import com.mooncity.gpsmock.trip.TripAlarms
 import com.mooncity.gpsmock.trip.TripSource
+import com.mooncity.gpsmock.trip.millisToZoned
+import java.time.ZonedDateTime
 import kotlin.random.Random
 
 /**
@@ -42,6 +46,9 @@ class MockLocationService : Service() {
         const val ACTION_STOP = "com.mooncity.gpsmock.action.STOP"
         const val ACTION_UPDATE = "com.mooncity.gpsmock.action.UPDATE"
 
+        /** Re-evaluates the schedule right now; sent by the resume alarm. */
+        const val ACTION_WAKE = "com.mooncity.gpsmock.action.WAKE"
+
         /** Broadcast sent whenever the running state or the error state changes. */
         const val BROADCAST_STATUS = "com.mooncity.gpsmock.STATUS"
 
@@ -55,12 +62,35 @@ class MockLocationService : Service() {
         /** How often a fresh fix is injected. Snapchat and friends discard stale fixes. */
         private const val UPDATE_INTERVAL_MS = 900L
 
+        /**
+         * How often a paused session re-checks the schedule. Only a backstop: the resume
+         * alarm is what gets us going on time, this catches a dropped or throttled alarm.
+         */
+        private const val IDLE_INTERVAL_MS = 30_000L
+
         /** ~1.2 m of wobble, so the position is not suspiciously frozen. */
         private const val JITTER_DEG = 0.000011
 
+        /** True while the service is up, whether or not it is currently mocking. */
         @Volatile
         var isRunning = false
             private set
+
+        /**
+         * True while a trip session is parked outside its window. The test providers are
+         * unregistered in that state, so the phone reports its real position again.
+         */
+        @Volatile
+        var isPaused = false
+            private set
+
+        /** When the paused session comes back, or 0 if nothing is scheduled. */
+        @Volatile
+        var resumeAtMillis = 0L
+            private set
+
+        /** True only while fixes are actually being injected. */
+        val isMocking: Boolean get() = isRunning && !isPaused
 
         @Volatile
         var lastError: String? = null
@@ -105,6 +135,17 @@ class MockLocationService : Service() {
             val i = Intent(ctx, MockLocationService::class.java).apply { action = ACTION_STOP }
             ctx.startService(i)
         }
+
+        /**
+         * Asks a running session to look at the clock again, used when a paused window is
+         * due to open. Only legal because the foreground service is already up, which is
+         * what exempts us from the background start restriction.
+         */
+        fun wake(ctx: Context) {
+            if (!isRunning) return
+            val i = Intent(ctx, MockLocationService::class.java).apply { action = ACTION_WAKE }
+            runCatching { ctx.startService(i) }.recoverCatching { ctx.startForegroundService(i) }
+        }
     }
 
     private lateinit var locationManager: LocationManager
@@ -114,16 +155,32 @@ class MockLocationService : Service() {
 
     @Volatile private var lat = 0.0
     @Volatile private var lon = 0.0
+    @Volatile private var trip: Trip? = null
     @Volatile private var tripSource: TripSource? = null
     @Volatile private var phaseLabel: String? = null
     private var lastNotifUpdate = 0L
     private val registered = mutableSetOf<String>()
 
+    /**
+     * Bumped whenever a fresh loop is posted. A wake-up can land while a pass is already
+     * running, where removeCallbacks has nothing to cancel; without this the old pass would
+     * requeue itself and two chains would push at once.
+     */
+    @Volatile private var loopGeneration = 0
+
     private val tick = object : Runnable {
         override fun run() {
-            pushFix()
-            handler?.postDelayed(this, UPDATE_INTERVAL_MS)
+            val gen = loopGeneration
+            val next = step()
+            if (next >= 0 && gen == loopGeneration) handler?.postDelayed(this, next)
         }
+    }
+
+    /** Restarts the loop, replacing whatever pass is queued or in flight. */
+    private fun restartLoop(delayMs: Long) {
+        loopGeneration++
+        handler?.removeCallbacks(tick)
+        handler?.postDelayed(tick, delayMs)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -152,8 +209,17 @@ class MockLocationService : Service() {
                     lon = intent.getDoubleExtra(EXTRA_LON, lon)
                     Prefs.saveTarget(this, lat, lon)
                     notifyForeground()
-                    pushFix()
+                    pushFix(null)
                 }
+            }
+
+            ACTION_WAKE -> {
+                if (!isRunning) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                // Run the loop now rather than at the end of the idle interval.
+                restartLoop(0L)
             }
 
             else -> {
@@ -162,16 +228,18 @@ class MockLocationService : Service() {
                 Prefs.setMode(this, mode)
 
                 if (mode == Prefs.MODE_TRIP) {
-                    val trip = Trip.load(this)
-                    if (trip == null) {
+                    val loaded = Trip.load(this)
+                    if (loaded == null) {
                         lastError = getString(R.string.err_no_trip)
                         Prefs.setActive(this, false)
                         broadcastStatus()
                         stopSelf()
                         return START_NOT_STICKY
                     }
-                    tripSource = TripSource(trip)
+                    trip = loaded
+                    tripSource = TripSource(loaded)
                 } else {
+                    trip = null
                     tripSource = null
                     lat = intent?.getDoubleExtra(EXTRA_LAT, Prefs.lat(this)) ?: Prefs.lat(this)
                     lon = intent?.getDoubleExtra(EXTRA_LON, Prefs.lon(this)) ?: Prefs.lon(this)
@@ -196,38 +264,48 @@ class MockLocationService : Service() {
         notifyForeground()
 
         lastError = null
-        if (!registerProviders()) {
-            // Nothing to run. The activity reads lastError, so shut down instead of
-            // sitting in the foreground with a dead session.
-            Prefs.setActive(this, false)
-            isRunning = false
-            broadcastStatus()
-            Notifier.mockStopped(this, lastError ?: getString(R.string.err_unknown))
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return
-        }
+        isPaused = false
         Notifier.clear(this, Notifier.ID_STOPPED)
         Notifier.clear(this, Notifier.ID_TRIP_DUE)
-
-        if (wakeLock == null) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GpsMock::loop").apply {
-                setReferenceCounted(false)
-                acquire()
-            }
-        }
 
         if (thread == null) {
             thread = HandlerThread("gpsmock-loop").also { it.start() }
             handler = Handler(thread!!.looper)
         }
-        handler?.removeCallbacks(tick)
-        handler?.post(tick)
+
+        // Starting outside the trip's window: park straight away rather than taking the
+        // providers for a moment just to hand them back on the first tick.
+        if (shouldPause()) {
+            isRunning = true
+            enterPause()
+            restartLoop(IDLE_INTERVAL_MS)
+            return
+        }
+
+        if (!registerProviders()) {
+            loopGeneration++
+            handler?.removeCallbacks(tick)
+            failAndStop()
+            return
+        }
+
+        acquireWakeLock()
+        restartLoop(0L)
 
         isRunning = true
         broadcastStatus()
         notifyForeground()
+    }
+
+    /** Nothing to run. The activity reads lastError, so shut down instead of idling dead. */
+    private fun failAndStop() {
+        Prefs.setActive(this, false)
+        isRunning = false
+        isPaused = false
+        broadcastStatus()
+        Notifier.mockStopped(this, lastError ?: getString(R.string.err_unknown))
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun stopMocking() {
@@ -237,13 +315,129 @@ class MockLocationService : Service() {
         handler = null
 
         unregisterProviders()
+        releaseWakeLock()
+        TripAlarms.cancelResume(this)
 
-        wakeLock?.let { if (it.isHeld) it.release() }
-        wakeLock = null
-
+        trip = null
         tripSource = null
         phaseLabel = null
+        isPaused = false
+        resumeAtMillis = 0L
         isRunning = false
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock != null) return
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GpsMock::loop").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+    }
+
+    // -- the window ---------------------------------------------------------------------------
+
+    private fun shouldPause(): Boolean {
+        val source = tripSource ?: return false
+        return Prefs.pauseOutsideTrip(this) && source.isIdleAt(System.currentTimeMillis())
+    }
+
+    /**
+     * One pass of the loop. Returns the delay until the next pass, or a negative value when
+     * the loop is over because the service is shutting down.
+     */
+    private fun step(): Long {
+        val source = tripSource
+        if (source == null) {
+            pushFix(null)
+            return UPDATE_INTERVAL_MS
+        }
+
+        val fix = source.fixAt(System.currentTimeMillis())
+
+        if (fix.phase == Phase.FINISHED) {
+            finishTrip()
+            return -1L
+        }
+
+        if (fix.idle && Prefs.pauseOutsideTrip(this)) {
+            if (!isPaused) enterPause()
+            return IDLE_INTERVAL_MS
+        }
+
+        if (isPaused) {
+            // The window just opened. Come back on the next pass, so the fix is computed
+            // against the trip as it is now rather than the one loaded before the pause.
+            return if (leavePause()) 0L else -1L
+        }
+
+        pushFix(fix)
+        return UPDATE_INTERVAL_MS
+    }
+
+    /**
+     * Hands the providers back for the gap between the return leg and the next departure.
+     * The service stays up as the thing that knows when to come back, but without the test
+     * providers and without the wake lock the phone reports and behaves as it normally would.
+     */
+    private fun enterPause() {
+        isPaused = true
+        phaseLabel = null
+
+        unregisterProviders()
+        releaseWakeLock()
+
+        val next = trip?.let { Schedule.nextDeparture(it, ZonedDateTime.now(Schedule.zone())) }
+        resumeAtMillis = next?.toInstant()?.toEpochMilli() ?: 0L
+        if (resumeAtMillis > System.currentTimeMillis()) {
+            TripAlarms.armResume(this, resumeAtMillis)
+        } else {
+            TripAlarms.cancelResume(this)
+        }
+
+        notifyForeground()
+        broadcastStatus()
+        Log.i(TAG, "paused until $resumeAtMillis")
+    }
+
+    /** Takes the providers back for a window that has just opened. */
+    private fun leavePause(): Boolean {
+        TripAlarms.cancelResume(this)
+        resumeAtMillis = 0L
+        isPaused = false
+
+        // The schedule may have been edited while we were idle.
+        Trip.load(this)?.let {
+            trip = it
+            tripSource = TripSource(it)
+        }
+
+        lastError = null
+        if (!registerProviders()) {
+            failAndStop()
+            return false
+        }
+
+        acquireWakeLock()
+        Notifier.clear(this, Notifier.ID_TRIP_DUE)
+        notifyForeground()
+        broadcastStatus()
+        return true
+    }
+
+    /** A one-off trip has run its course; nothing is left to report. */
+    private fun finishTrip() {
+        Prefs.setActive(this, false)
+        stopMocking()
+        broadcastStatus()
+        Notifier.tripFinished(this)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun registerProviders(): Boolean {
@@ -296,31 +490,16 @@ class MockLocationService : Service() {
         registered.clear()
     }
 
-    private fun pushFix() {
+    /** Injects one position: the trip's [fix], or the fixed target when it is null. */
+    private fun pushFix(fix: Fix?) {
         val jitterOn = Prefs.jitter(this)
         val accuracy = Prefs.accuracy(this)
         val now = System.currentTimeMillis()
 
         var bearing = Random.nextDouble(0.0, 360.0).toFloat()
         var speed = 0f
-        val snapshotLat: Double
-        val snapshotLon: Double
 
-        val source = tripSource
-        if (source != null) {
-            val fix = source.fixAt(now)
-            if (fix.phase == Phase.FINISHED) {
-                // One-off trip is over. Nothing left to report.
-                Prefs.setActive(this, false)
-                stopMocking()
-                broadcastStatus()
-                Notifier.tripFinished(this)
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return
-            }
-            snapshotLat = fix.lat
-            snapshotLon = fix.lon
+        if (fix != null) {
             bearing = fix.bearing
             speed = fix.speed
             lat = fix.lat
@@ -332,10 +511,11 @@ class MockLocationService : Service() {
                 lastNotifUpdate = now
                 notifyForeground()
             }
-        } else {
-            snapshotLat = lat
-            snapshotLon = lon
         }
+
+        // Read once: ACTION_UPDATE can retarget a static session from another thread.
+        val snapshotLat = lat
+        val snapshotLon = lon
 
         for (p in registered.toList()) {
             val loc = buildLocation(p, snapshotLat, snapshotLon, jitterOn, accuracy, bearing, speed)
@@ -387,6 +567,13 @@ class MockLocationService : Service() {
         }
     }
 
+    /** When the paused session comes back, phrased for a notification. */
+    private fun nextWindowLabel(): String {
+        val at = resumeAtMillis
+        if (at <= 0L) return getString(R.string.trip_next_none)
+        return Schedule.humanTime(millisToZoned(at))
+    }
+
     private fun describe(fix: Fix): String = when (fix.phase) {
         Phase.OUTBOUND -> getString(
             R.string.phase_outbound, (fix.progress * 100).toInt(), (fix.speed * 3.6f).toInt()
@@ -428,10 +615,19 @@ class MockLocationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val text = lastError ?: phaseLabel ?: getString(R.string.notif_text, lat, lon)
+        val text = when {
+            lastError != null -> lastError!!
+            isPaused -> getString(R.string.notif_paused_text, nextWindowLabel())
+            else -> phaseLabel ?: getString(R.string.notif_text, lat, lon)
+        }
+        val title = when {
+            lastError != null -> R.string.notif_error
+            isPaused -> R.string.notif_paused
+            else -> R.string.notif_title
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(if (lastError != null) R.string.notif_error else R.string.notif_title))
+            .setContentTitle(getString(title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSmallIcon(R.drawable.ic_stat_pin)

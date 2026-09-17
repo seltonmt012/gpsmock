@@ -142,6 +142,13 @@ class TripActivity : AppCompatActivity() {
         b.presetOnce.setOnClickListener { applyDays(emptySet()) }
         b.dayGroup.addOnButtonCheckedListener { _, _, _ -> updateRepeatSummary() }
 
+        b.switchPauseOutside.isChecked = Prefs.pauseOutsideTrip(this)
+        b.switchPauseOutside.setOnCheckedChangeListener { _, checked ->
+            Prefs.setPauseOutsideTrip(this, checked)
+            // A running session picks the change up on its next pass.
+            MockLocationService.wake(this)
+        }
+
         b.switchAutoStart.isChecked = Prefs.autoStart(this)
         b.switchAutoStart.setOnCheckedChangeListener { _, checked ->
             Prefs.setAutoStart(this, checked)

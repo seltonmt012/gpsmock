@@ -14,6 +14,7 @@ object Prefs {
     private const val KEY_JITTER = "jitter"
     private const val KEY_MODE = "mode"
     private const val KEY_AUTOSTART = "autoStart"
+    private const val KEY_PAUSE_OUTSIDE = "pauseOutside"
     private const val KEY_REAL_LAT = "realLat"
     private const val KEY_REAL_LON = "realLon"
     private const val KEY_REAL_AT = "realAt"
@@ -53,6 +54,15 @@ object Prefs {
     /** Whether a scheduled departure may start the service on its own. */
     fun autoStart(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_AUTOSTART, false)
     fun setAutoStart(ctx: Context, v: Boolean) = sp(ctx).edit().putBoolean(KEY_AUTOSTART, v).apply()
+
+    /**
+     * Whether the trip mode hands the providers back between the return leg and the next
+     * departure. Off means the start point is broadcast around the clock, which is what
+     * every version before 1.5 did.
+     */
+    fun pauseOutsideTrip(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_PAUSE_OUTSIDE, true)
+    fun setPauseOutsideTrip(ctx: Context, v: Boolean) =
+        sp(ctx).edit().putBoolean(KEY_PAUSE_OUTSIDE, v).apply()
 
     /** Last position read from the real GPS, kept because mocking hides it afterwards. */
     fun saveRealFix(ctx: Context, lat: Double, lon: Double, atMillis: Long) {

@@ -17,7 +17,13 @@ data class Fix(
     val speed: Float,
     val phase: Phase,
     /** 0..1 through the current leg, for the notification. */
-    val progress: Float
+    val progress: Float,
+    /**
+     * True while the trip is outside its window: the return leg is over and the next
+     * departure has not come round yet. Nothing is happening, so there is nothing worth
+     * simulating and the service may hand the real providers back.
+     */
+    val idle: Boolean = false
 )
 
 /**
@@ -55,7 +61,7 @@ class TripSource(private val trip: Trip) {
 
         // Before the very first departure there is nothing to replay yet.
         val occ = Schedule.currentOccurrence(trip, now)
-            ?: return stay(trip.startLat, trip.startLon, Phase.AT_START)
+            ?: return stay(trip.startLat, trip.startLon, Phase.AT_START, idle = true)
 
         val anchor = occ.outStart.toInstant().toEpochMilli()
         val retStartMs = occ.returnStart.toInstant().toEpochMilli()
@@ -63,6 +69,12 @@ class TripSource(private val trip: Trip) {
         // A one-off trip has nothing after its single return leg.
         if (trip.days.isEmpty() && nowMillis >= retStartMs + inDurMs) {
             return stay(trip.startLat, trip.startLon, Phase.FINISHED)
+        }
+
+        // A one-off whose departure is still ahead — a scheduled trip never lands here,
+        // because currentOccurrence only hands back departures that have already passed.
+        if (nowMillis < anchor) {
+            return stay(trip.startLat, trip.startLon, Phase.AT_START, idle = true)
         }
 
         val outEndMs = anchor + outDurMs
@@ -78,9 +90,13 @@ class TripSource(private val trip: Trip) {
             nowMillis < retEndMs ->
                 travel(inPts, inCum, (nowMillis - retStartMs).toDouble() / inDurMs, inSpeed, Phase.INBOUND)
 
-            else -> stay(trip.startLat, trip.startLon, Phase.AT_START)
+            // Home again, next departure not due: the window is closed.
+            else -> stay(trip.startLat, trip.startLon, Phase.AT_START, idle = true)
         }
     }
+
+    /** Whether [nowMillis] falls outside the trip's active window. */
+    fun isIdleAt(nowMillis: Long): Boolean = fixAt(nowMillis).idle
 
     /** Human-readable leg lengths, for the setup screen. */
     val outboundSummary: Pair<Double, Double>
@@ -88,8 +104,8 @@ class TripSource(private val trip: Trip) {
 
     // -- geometry -----------------------------------------------------------------------------
 
-    private fun stay(lat: Double, lon: Double, phase: Phase) =
-        Fix(lat, lon, 0f, 0f, phase, if (phase == Phase.AT_DESTINATION) 1f else 0f)
+    private fun stay(lat: Double, lon: Double, phase: Phase, idle: Boolean = false) =
+        Fix(lat, lon, 0f, 0f, phase, if (phase == Phase.AT_DESTINATION) 1f else 0f, idle)
 
     private fun travel(
         pts: List<DoubleArray>,

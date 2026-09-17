@@ -262,6 +262,17 @@
             android:layout_marginTop="8dp" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchPauseOutside"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/trip_pause_outside" />
+
+        <TextView
+            style="@style/ResolvedLabel"
+            android:text="@string/trip_pause_outside_hint" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switchAutoStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

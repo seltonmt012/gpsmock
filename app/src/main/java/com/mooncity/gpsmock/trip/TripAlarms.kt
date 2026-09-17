@@ -23,9 +23,41 @@ import java.time.format.DateTimeFormatter
 object TripAlarms {
 
     private const val REQUEST_CODE = 8100
+    private const val RESUME_REQUEST_CODE = 8101
 
     /** Fire slightly early so the service is already pushing fixes at departure time. */
     private const val LEAD_MILLIS = 60_000L
+
+    /**
+     * Wakes a paused session at the exact moment its window opens again.
+     *
+     * A handler callback would do while the phone is awake, but the pause typically spans a
+     * night in Doze, where nothing but an alarm is guaranteed to fire on time.
+     */
+    fun armResume(ctx: Context, atMillis: Long) {
+        val am = ctx.getSystemService(AlarmManager::class.java) ?: return
+        val pending = resumeIntent(ctx)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
+            } else {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
+            }
+        } catch (e: SecurityException) {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
+        }
+    }
+
+    fun cancelResume(ctx: Context) {
+        ctx.getSystemService(AlarmManager::class.java)?.cancel(resumeIntent(ctx))
+    }
+
+    private fun resumeIntent(ctx: Context): PendingIntent = PendingIntent.getBroadcast(
+        ctx,
+        RESUME_REQUEST_CODE,
+        Intent(ctx, TripAlarmReceiver::class.java).setAction(TripAlarmReceiver.ACTION_RESUME),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
 
     fun reschedule(ctx: Context) {
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return
@@ -72,6 +104,7 @@ class TripAlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION = "com.mooncity.gpsmock.action.TRIP_DUE"
+        const val ACTION_RESUME = "com.mooncity.gpsmock.action.TRIP_RESUME"
         private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     }
 
@@ -79,8 +112,18 @@ class TripAlarmReceiver : BroadcastReceiver() {
         val trip = Trip.load(ctx)
         if (trip == null) {
             TripAlarms.cancel(ctx)
+            TripAlarms.cancelResume(ctx)
             return
         }
+
+        // A paused session only needs a nudge; it works out for itself what to do next.
+        // If it is gone — process killed, never restarted — the window is opening with
+        // nothing running, which is the same situation as a plain departure below.
+        if (intent?.action == ACTION_RESUME && MockLocationService.isRunning) {
+            MockLocationService.wake(ctx)
+            return
+        }
+        if (intent?.action == ACTION_RESUME && !Prefs.isActive(ctx)) return
 
         val now = ZonedDateTime.now(Schedule.zone())
         val label = Schedule.currentOccurrence(trip, now)?.outStart?.format(HHMM)
@@ -88,7 +131,8 @@ class TripAlarmReceiver : BroadcastReceiver() {
             ?: "?"
 
         when {
-            MockLocationService.isRunning -> Unit // Already covering the departure.
+            // Already covering the departure — but it may be paused, so let it re-check.
+            MockLocationService.isRunning -> MockLocationService.wake(ctx)
 
             Prefs.autoStart(ctx) -> {
                 try {

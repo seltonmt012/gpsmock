@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 /** One concrete there-and-back run on a specific date. */
 data class Occurrence(
@@ -24,6 +25,8 @@ object Schedule {
 
     /** How far back to look for a departure that is still in progress. */
     private const val LOOKBACK_DAYS = 8L
+
+    private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     fun zone(): ZoneId = ZoneId.systemDefault()
 
@@ -102,6 +105,17 @@ object Schedule {
             if (start.isAfter(now)) return start
         }
         return null
+    }
+
+    /** "06:00", "morgen 06:00" or "Mo 06:00" — whichever is unambiguous seen from [now]. */
+    fun humanTime(at: ZonedDateTime, now: ZonedDateTime = ZonedDateTime.now(zone())): String {
+        val time = at.format(HHMM)
+        val today = now.toLocalDate()
+        return when (at.toLocalDate()) {
+            today -> time
+            today.plusDays(1) -> "morgen $time"
+            else -> "${short(at.dayOfWeek)} $time"
+        }
     }
 
     fun label(days: Set<DayOfWeek>): String = when {

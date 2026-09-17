@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.mooncity.gpsmock.trip.Trip
 import com.mooncity.gpsmock.trip.TripAlarms
 
 /**
@@ -29,11 +30,14 @@ class BootReceiver : BroadcastReceiver() {
 
         if (!Prefs.isActive(context)) return
 
-        val lat = Prefs.lat(context)
-        val lon = Prefs.lon(context)
-
         try {
-            MockLocationService.start(context, lat, lon)
+            // Resume in the mode that was running, or a trip would come back as a static
+            // point stuck on the last target.
+            if (Prefs.mode(context) == Prefs.MODE_TRIP && Trip.load(context) != null) {
+                MockLocationService.startTrip(context)
+            } else {
+                MockLocationService.start(context, Prefs.lat(context), Prefs.lon(context))
+            }
         } catch (e: Exception) {
             postResumeNotification(context)
         }

@@ -35,6 +35,14 @@ by tick. A killed and restarted process therefore resumes at the correct point o
 instead of teleporting back to where it left off, and a phone that was off during the ride
 picks up wherever the schedule says it should be.
 
+Outside the window — after the return leg, before the next departure — the simulation
+pauses instead of parking on the start point around the clock: the test providers are
+handed back, the wake lock is released, and the phone reports its real position again until
+the next departure wakes it (exact alarm, so a night in Doze does not delay it). The
+service stays up as the thing that knows when to come back, and its notification says when
+that is. Turn *Außerhalb der Fahrzeiten pausieren* off in the trip screen for the old
+around-the-clock behaviour.
+
 ## Setup
 
 1. Install the APK from [Releases](../../releases/latest).
