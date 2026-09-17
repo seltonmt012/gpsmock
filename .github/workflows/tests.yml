@@ -1,0 +1,65 @@
+# Führt die JVM-Tests der Fahrtlogik bei jedem Push aus.
+#
+# Absichtlich getrennt vom Release-Workflow: hier werden keine Secrets gebraucht und
+# nichts veröffentlicht, das darf also bei jedem Push laufen.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Android SDK bereitstellen
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+
+      # Debug-Variante, weil die Release-Variante ohne keystore.properties keine
+      # Signaturkonfiguration hat - für Unit-Tests ist die ohnehin bedeutungslos.
+      - name: Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      # Gradle nennt im Fehlerfall nur die Anzahl und einen Pfad zum HTML-Bericht,
+      # den es hier nicht anzuschauen gibt. Also die Ursachen direkt ins Log.
+      - name: Fehlgeschlagene Tests ausgeben
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          gefunden = False
+          for pfad in glob.glob("app/build/test-results/**/*.xml", recursive=True):
+              try:
+                  wurzel = ET.parse(pfad).getroot()
+              except ET.ParseError:
+                  continue
+              for fall in wurzel.iter("testcase"):
+                  schlecht = fall.findall("failure") + fall.findall("error")
+                  for eintrag in schlecht:
+                      gefunden = True
+                      print(f"FEHLER: {fall.get('classname')}.{fall.get('name')}")
+                      text = (eintrag.text or eintrag.get("message") or "").strip()
+                      print(text[:1500])
+                      print("-" * 60)
+
+          if not gefunden:
+              print("Keine Testergebnisse gefunden - der Build ist vermutlich vorher gescheitert.")
+          PY
