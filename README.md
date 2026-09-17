@@ -72,6 +72,23 @@ Requires JDK 17+ and the Android SDK (platform 35).
 Signing reads `keystore.properties` from the project root, which is not in version
 control. Without it the release build is unsigned.
 
+## Releasing
+
+Bump `versionCode` **and** `versionName` in `app/build.gradle.kts`, push, then run the
+*Release* workflow under Actions and type what changed. It builds the signed APK on
+GitHub's machines, creates the release and points `update.json` at it, which is the moment
+installed apps start seeing the update. A version that was already released is refused
+rather than published, because clients would otherwise be pointed at an APK they already
+have and keep offering the same update forever.
+
+The workflow signs with four repository secrets — `KEYSTORE_BASE64` (the `.jks` file,
+base64 encoded), `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. An APK signed with a
+different key cannot install over an existing one, so these have to be the same key every
+time.
+
+`publish.ps1` does the same thing locally and still works on a machine with the JDK and the
+SDK installed.
+
 ## Map data
 
 Map tiles come from OpenStreetMap; place search uses Nominatim.
