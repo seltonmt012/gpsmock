@@ -74,7 +74,29 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p keystore
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/gpsmock.jks
+
+          # Leerzeichen und Zeilenumbrüche raus: je nachdem womit der String kopiert
+          # wurde, kommt er umgebrochen an, und base64 -d steigt dann aus.
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > keystore/gpsmock.jks 2>/dev/null; then
+            echo "::error::KEYSTORE_BASE64 ist kein gültiges Base64. Erwartet wird der Inhalt von keystore/gpsmock.jks als eine lange Base64-Zeile (rund 5200 Zeichen), nicht der Text aus keystore.properties und nicht der Dateipfad."
+            exit 1
+          fi
+
+          # Ein Java-Keystore ist ein paar Kilobyte groß. Ist das Ergebnis winzig,
+          # war das Secret zwar dekodierbar, aber nicht die Keystore-Datei.
+          size=$(stat -c%s keystore/gpsmock.jks)
+          if [ "$size" -lt 1000 ]; then
+            echo "::error::Dekodiert wurden nur $size Bytes - das ist keine Keystore-Datei."
+            exit 1
+          fi
+
+          # Passwort hier prüfen, sonst scheitert erst der Build mit einer Meldung,
+          # der man nicht ansieht, dass das Secret schuld ist.
+          if ! keytool -list -keystore keystore/gpsmock.jks -storepass "$STORE_PASSWORD" > /dev/null 2>&1; then
+            echo "::error::Keystore lässt sich nicht öffnen: entweder ist die Datei beschädigt oder KEYSTORE_PASSWORD stimmt nicht."
+            exit 1
+          fi
+
           # Der Build liest genau diese Datei; Pfad ist relativ zum Projektwurzelverzeichnis.
           {
             echo "storeFile=keystore/gpsmock.jks"
