@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
-  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.4/GpsMock.apk",
-  "notes": "Karten-Auswahl: 'Karte' oeffnet jetzt eine echte Vollbildkarte mit Fadenkreuz, Suche und Standort-Button. Die Adresse unter dem Fadenkreuz wird live aufgeloest. Adressvorschlaege beim Tippen wie bei Google Maps - antippen uebernimmt den Ort."
+  "versionCode": 6,
+  "versionName": "1.5",
+  "apkUrl": "https://github.com/seltonmt012/gpsmock/releases/download/v1.5/GpsMock.apk",
+  "notes": "Die Simulation pausiert jetzt außerhalb der Fahrzeiten: nach der Rückfahrt wird nichts mehr gesendet, bis die nächste Abfahrt ansteht — in der Zwischenzeit ist dein echter Standort wieder sichtbar. Vorher wurde rund um die Uhr der Startpunkt gemeldet. Abschaltbar im Fahrt-Screen. Außerdem bleibt eine Fahrt nach einem Neustart eine Fahrt, statt zu einem festen Punkt zu werden."
 }

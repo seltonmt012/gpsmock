@@ -105,10 +105,10 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"
           } > keystore.properties
 
+      # Kein chmod auf gradlew: das Ausführbar-Bit hängt am Repo. Ein chmod hier wäre
+      # eine ungestagte Änderung, an der der spätere git pull --rebase scheitert.
       - name: Bauen
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       # Ohne diese Prüfung könnte eine unsigniert durchgerutschte APK veröffentlicht
       # werden, die sich auf keinem Handy installieren lässt.
@@ -150,7 +150,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add update.json
           git commit -m "Release $TAG"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
+          # --autostash, damit irgendein Nebenprodukt des Builds im Arbeitsverzeichnis
+          # nicht das Veröffentlichen blockiert, nachdem das Release schon draußen ist.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Signaturmaterial wegräumen
