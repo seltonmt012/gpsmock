@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#1B2A4A</color>
+    <!-- Der Launcher-Hintergrund ist ein eigenes Drawable mit Verlauf; eine Farbe gleichen
+         Namens daneben wäre nur eine Stolperfalle beim Lesen. -->
     <color name="crosshair">#E53935</color>
 </resources>

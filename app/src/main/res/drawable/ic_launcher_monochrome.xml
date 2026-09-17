@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ebene für die eingefärbten Icons ab Android 13. Das System kennt hier nur Deckkraft und
+  malt alles in einer Farbe - ein zweiter Marker würde zu einem Fleck verschmelzen. Deshalb
+  bleibt nur die Silhouette des gemeldeten Standorts übrig.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M39.89,55.53 L54,82 L68.11,55.53 A16,16 0 1 0 39.89,55.53 Z M60.5,48 A6.5,6.5 0 1 1 47.5,48 A6.5,6.5 0 1 1 60.5,48 Z" />
+</vector>

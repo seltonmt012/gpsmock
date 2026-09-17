@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hintergrund des Launcher-Icons.
+
+  Vollflächig bis zum Rand, weil Android je nach Launcher-Form beliebig davon wegschneidet -
+  nur die mittleren 72 von 108 dp sind sicher sichtbar.
+
+  Das Straßennetz ist absichtlich kaum zu sehen: bei 48 dp soll es als Textur wirken,
+  die den Verlauf lebendig macht, nicht als Detail, das man entziffern will.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108">
+                <item
+                    android:offset="0"
+                    android:color="#FF0C1E38" />
+                <item
+                    android:offset="0.5"
+                    android:color="#FF143354" />
+                <item
+                    android:offset="1"
+                    android:color="#FF10506B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Hauptstraße, führt unter dem Marker durch -->
+    <path
+        android:strokeColor="#1FFFFFFF"
+        android:strokeWidth="5"
+        android:pathData="M-10,84 L118,52" />
+
+    <!-- Querstraßen -->
+    <path
+        android:strokeColor="#14FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M26,-10 L58,118" />
+    <path
+        android:strokeColor="#14FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M-10,34 L118,6" />
+    <path
+        android:strokeColor="#0FFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M84,-10 L104,118" />
+</vector>

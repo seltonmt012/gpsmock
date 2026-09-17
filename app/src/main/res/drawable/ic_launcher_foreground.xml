@@ -1,15 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vordergrund des Launcher-Icons: der gemeldete Standort und sein versetztes Echo.
+
+  Das ist genau das, was die App tut - sie gibt eine Position heraus, die woanders liegt als
+  die echte. Der weiße Marker ist die gemeldete, der cyanfarbene Umriss dahinter die
+  verschobene. Deshalb ist einer gefüllt und einer nur konturiert: gefüllt wirkt wie eine
+  Tatsache, ein Umriss wie eine Behauptung.
+
+  Alle Formen liegen innerhalb eines Kreises mit Radius 33 um die Mitte (54,54), damit auch
+  die aggressivste Launcher-Maske nichts abschneidet.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="2.6"
-        android:scaleY="2.6"
-        android:translateX="22.8"
-        android:translateY="22.8">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13C19,5.13 15.87,2 12,2zM12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5 2.5,1.12 2.5,2.5S13.38,11.5 12,11.5z" />
-    </group>
+
+    <!-- Echo: liegt hinten, wird vom weißen Marker teilweise verdeckt. Das Überlappen ist
+         gewollt, es erzeugt die Tiefe, die die beiden erst als zwei Ebenen lesbar macht.
+
+         Gefüllt statt konturiert: eine 5 Einheiten breite Linie ist bei 36 px Icongröße
+         noch anderthalb Pixel breit und verschmiert zu einem Fleck. Eine Fläche überlebt
+         das Verkleinern, eine Kontur nicht. -->
+    <path
+        android:fillColor="#FF6FD3F7"
+        android:pathData="M26.42,49.65 L37,69.5 L47.58,49.65 A12,12 0 1 0 26.42,49.65 Z" />
+
+    <!-- Gemeldeter Standort. Das Loch bleibt offen, damit der Kartenhintergrund
+         durchscheint - das bindet Vorder- und Hintergrund zusammen. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M43.89,53.53 L58,80 L72.11,53.53 A16,16 0 1 0 43.89,53.53 Z M64.5,46 A6.5,6.5 0 1 1 51.5,46 A6.5,6.5 0 1 1 64.5,46 Z" />
 </vector>
